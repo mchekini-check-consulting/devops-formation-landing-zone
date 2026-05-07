@@ -9,7 +9,7 @@ terraform {
 
   backend "azurerm" {
     resource_group_name = "rg-tfstate"
-    storage_account_name = "sanecomformation"
+    storage_account_name = "sanformationecom"
     container_name = "ecom-formation-tfstate"
     key = "terraform.tfstate"
   }
