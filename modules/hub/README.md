@@ -8,10 +8,15 @@ Le Hub centralise les **services partagés** utilisés par tous les Spokes (proj
 
 Ce module crée :
 - ✅ 4 Resource Groups (monitoring, network, security, devops)
+<<<<<<< HEAD
 - ✅ 1 VNet Hub
 - ✅ 1 Azure Container Registry (ACR) Standard avec authentification obligatoire (dans le RG DevOps)
 - ✅ 1 Azure Key Vault dans le RG security
 - ✅ 1 paire de clés SSH ED25519 générée et stockée dans Key Vault
+=======
+- ✅ 1 VNet Hub avec 1 Subnet APIM (10.0.0.0/24)
+- ✅ 1 Azure API Management (Developer, External) dans le RG DevOps
+>>>>>>> 187da20 (docs: update README with APIM documentation)
 - ✅ Infrastructure prête pour les services partagés
 
 ## 🏗️ Architecture
@@ -24,6 +29,7 @@ Hub (10.0.0.0/16)
 │
 ├── rg-formation-network      # Réseau Hub
 │   └── vnet-formation-hub
+│       ├── subnet-apim (10.0.0.0/24)
 │       ├── (Futur) Subnet Firewall
 │       ├── (Futur) Subnet VPN Gateway
 │       └── (Futur) Subnet Bastion
@@ -34,17 +40,27 @@ Hub (10.0.0.0/16)
 │       └── vm-admin-ssh-private-key
 │
 └── rg-formation-devops       # DevOps
+<<<<<<< HEAD
     ├── crformation (ACR Standard, authentification requise)
     └── Artifact Store (à déployer)
+=======
+    ├── apim-formation (API Management, External)
+    └── Container Registry, Artifact Store (à déployer)
+>>>>>>> 187da20 (docs: update README with APIM documentation)
 ```
 
 ## 📁 Structure du Module
 
 ```
 modules/hub/
+<<<<<<< HEAD
 ├── main.tf         # Resource Groups + VNet Hub
 ├── acr.tf          # Azure Container Registry
 ├── keyvault.tf     # Key Vault + génération clés SSH
+=======
+├── main.tf         # Resource Groups + VNet Hub + Subnet APIM
+├── apim.tf         # Azure API Management
+>>>>>>> 187da20 (docs: update README with APIM documentation)
 ├── variables.tf    # Variables d'entrée
 ├── outputs.tf      # Outputs (vnet_hub_id, acr_id, acr_login_server)
 └── README.md       # Ce fichier
@@ -97,6 +113,7 @@ module "hub" {
 | `ssh_public_key_secret_name` | Nom du secret contenant la clé publique SSH | `string` | - | ✅ |
 | `ssh_private_key_secret_name` | Nom du secret contenant la clé privée SSH | `string` | - | ✅ |
 | `tags` | Tags additionnels | `map(string)` | `{}` | ❌ |
+| `apim_publisher_email` | Email du publisher pour l'APIM | `string` | - | ✅ |
 
 ## 📤 Outputs
 
@@ -108,6 +125,7 @@ module "hub" {
 | `monitoring_resource_group_name` | Nom du RG monitoring |
 | `security_resource_group_name` | Nom du RG security |
 | `devops_resource_group_name` | Nom du RG devops |
+<<<<<<< HEAD
 | `acr_login_server` | URL du registre ACR pour pull les images |
 | `acr_id` | ID de l'ACR pour les role assignments RBAC |
 | `vnet_hub_id` | ID du VNet Hub |
@@ -115,6 +133,9 @@ module "hub" {
 | `resource_group_name` | Nom du RG réseau (pour peering) |
 | `key_vault_id` | ID du Key Vault |
 | `key_vault_name` | Nom du Key Vault |
+=======
+| `apim_public_ip` | IP publique de l'APIM pour les tests depuis le navigateur |
+>>>>>>> 187da20 (docs: update README with APIM documentation)
 
 ### Exemple d'utilisation des outputs
 
@@ -239,11 +260,15 @@ resource "azurerm_key_vault" "main" {
 
 **Fonction :** Outils et services DevOps
 
+**Services déployés :**
+- ✅ Azure API Management (SKU Developer, mode External)
+
 **Services recommandés :**
 - ✅ Azure Container Registry
 - ✅ Azure DevOps Artifacts
 - ✅ Self-hosted agents
 
+<<<<<<< HEAD
 **Exemple Container Registry :**
 ```hcl
 resource "azurerm_container_registry" "main" {
@@ -255,6 +280,8 @@ resource "azurerm_container_registry" "main" {
 }
 ```
 
+=======
+>>>>>>> 187da20 (docs: update README with APIM documentation)
 ## 🗺️ Plan d'Adressage
 
 ### VNet Hub par défaut
@@ -262,10 +289,11 @@ resource "azurerm_container_registry" "main" {
 ```
 VNet Hub: 10.0.0.0/16 (65,536 IPs)
 │
-├── (Futur) Subnet Bastion:      10.0.0.0/26   (64 IPs)
-├── (Futur) Subnet Firewall:     10.0.1.0/26   (64 IPs)
-├── (Futur) Subnet VPN Gateway:  10.0.2.0/26   (64 IPs)
-└── (Réservé pour autres usages) 10.0.3.0+
+├── Subnet APIM:                 10.0.0.0/24   (256 IPs)
+├── (Futur) Subnet Bastion:      10.0.1.0/26   (64 IPs)
+├── (Futur) Subnet Firewall:     10.0.2.0/26   (64 IPs)
+├── (Futur) Subnet VPN Gateway:  10.0.3.0/26   (64 IPs)
+└── (Réservé pour autres usages) 10.0.4.0+
 ```
 
 **Note :** Le VNet Hub est créé sans subnet. Vous pouvez ajouter les subnets selon vos besoins.
@@ -427,9 +455,7 @@ resource "azurerm_monitor_diagnostic_setting" "nsg" {
 
 ### Le VNet Hub n'a pas de subnets
 
-**Normal !** Le Hub VNet est créé vide par défaut.
-
-**Solution :** Ajouter les subnets selon vos besoins (Bastion, Firewall, etc.).
+Le Hub VNet contient par défaut uniquement le subnet APIM. Vous pouvez ajouter d'autres subnets selon vos besoins (Bastion, Firewall, etc.).
 
 ### Les Spokes ne peuvent pas communiquer entre eux
 

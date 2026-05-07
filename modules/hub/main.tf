@@ -47,4 +47,9 @@ resource "azurerm_subnet" "keycloak" {
   resource_group_name  = azurerm_resource_group.network.name
   virtual_network_name = azurerm_virtual_network.main.name
   address_prefixes     = [local.keycloak_subnet_prefix]
+resource "azurerm_subnet" "subnet-apim" {
+  name                 = "subnet-apim"
+  resource_group_name  = azurerm_resource_group.network.name
+  virtual_network_name = azurerm_virtual_network.main.name
+  address_prefixes     = [cidrsubnet(var.address_space, 8, 0)]  # 10.0.0.0/24
 }

@@ -32,6 +32,7 @@ variable "readers_group_object_id" {
   type = string
 }
 
+<<<<<<< HEAD
 variable "vm_size" {
   description = "Gabarit de la VM keycloak"
   type        = string
@@ -43,3 +44,9 @@ variable "vm_admin_username" {
   type        = string
   default     = "azureuser"
 }
+=======
+variable "apim_publisher_email" {
+  description = "Email du publisher pour Azure API Management"
+  type        = string
+}
+>>>>>>> 831822f (add APIM Sku Developper_1 in hub)

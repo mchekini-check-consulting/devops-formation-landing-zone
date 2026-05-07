@@ -85,3 +85,9 @@ variable "readers_group_object_id" {
   description = "Object ID du groupe Azure AD qui doit accéder aux secrets"
   type        = string
 }
+
+variable "apim_publisher_email" {
+  description = "Email du publisher pour Azure API Management"
+  type        = string
+  default     = "devops@formation.com"
+}
