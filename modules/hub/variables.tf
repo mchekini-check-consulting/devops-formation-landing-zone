@@ -15,3 +15,15 @@ variable "tags" {
   type = map(string)
   default = {}
 }
+
+variable "key_vault_name" {
+  type = string
+}
+
+variable "ssh_public_key_secret_name" {
+  type = string
+}
+
+variable "ssh_private_key_secret_name" {
+  type = string
+}
