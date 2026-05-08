@@ -9,6 +9,8 @@ Le Hub centralise les **services partagés** utilisés par tous les Spokes (proj
 Ce module crée :
 - ✅ 4 Resource Groups (monitoring, network, security, devops)
 - ✅ 1 VNet Hub
+- ✅ 1 Azure Key Vault dans le RG security
+- ✅ 1 paire de clés SSH ED25519 générée et stockée dans Key Vault
 - ✅ Infrastructure prête pour les services partagés
 
 ## 🏗️ Architecture
@@ -26,7 +28,9 @@ Hub (10.0.0.0/16)
 │       └── (Futur) Subnet Bastion
 │
 ├── rg-formation-security     # Sécurité
-│   └── Key Vault, Sentinel (à déployer)
+│   └── kv-formation-security
+│       ├── vm-admin-ssh-public-key
+│       └── vm-admin-ssh-private-key
 │
 └── rg-formation-devops       # DevOps
     └── Container Registry, Artifact Store (à déployer)
@@ -37,6 +41,7 @@ Hub (10.0.0.0/16)
 ```
 modules/hub/
 ├── main.tf         # Resource Groups + VNet Hub
+├── keyvault.tf     # Key Vault + génération clés SSH
 ├── variables.tf    # Variables d'entrée
 ├── outputs.tf      # Outputs
 └── README.md       # Ce fichier
@@ -53,6 +58,10 @@ module "hub" {
   team_name     = "formation"
   location      = "francecentral"
   address_space = "10.0.0.0/16"
+
+  key_vault_name              = "kv-formation-security"
+  ssh_public_key_secret_name  = "vm-admin-ssh-public-key"
+  ssh_private_key_secret_name = "vm-admin-ssh-private-key"
 }
 ```
 
@@ -81,18 +90,20 @@ module "hub" {
 | `team_name` | Nom de l'équipe | `string` | - | ✅ |
 | `location` | Région Azure | `string` | `"francecentral"` | ❌ |
 | `address_space` | CIDR du VNet Hub | `string` | `"10.0.0.0/16"` | ❌ |
+| `key_vault_name` | Nom du Key Vault | `string` | - | ✅ |
+| `ssh_public_key_secret_name` | Nom du secret contenant la clé publique SSH | `string` | - | ✅ |
+| `ssh_private_key_secret_name` | Nom du secret contenant la clé privée SSH | `string` | - | ✅ |
 | `tags` | Tags additionnels | `map(string)` | `{}` | ❌ |
 
 ## 📤 Outputs
 
 | Output | Description |
 |--------|-------------|
-| `vnet_id` | ID du VNet Hub |
-| `vnet_name` | Nom du VNet Hub |
-| `network_resource_group_name` | Nom du RG réseau (pour peering) |
-| `monitoring_resource_group_name` | Nom du RG monitoring |
-| `security_resource_group_name` | Nom du RG security |
-| `devops_resource_group_name` | Nom du RG devops |
+| `vnet_hub_id` | ID du VNet Hub |
+| `vnet_hub_name` | Nom du VNet Hub |
+| `resource_group_name` | Nom du RG réseau (pour peering) |
+| `key_vault_id` | ID du Key Vault |
+| `key_vault_name` | Nom du Key Vault |
 
 ### Exemple d'utilisation des outputs
 
@@ -102,9 +113,10 @@ module "ecom" {
   source = "./modules/spoke"
 
   # ... autres paramètres
-  hub_vnet_id             = module.hub.vnet_id
-  hub_vnet_name           = module.hub.vnet_name
-  hub_resource_group_name = module.hub.network_resource_group_name
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name = module.hub.resource_group_name
+  key_vault_id            = module.hub.key_vault_id
 }
 ```
 
@@ -124,8 +136,8 @@ module "ecom" {
 ```hcl
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "log-formation-monitoring"
-  location            = module.hub.monitoring_resource_group_location
-  resource_group_name = module.hub.monitoring_resource_group_name
+  location            = var.location
+  resource_group_name = "rg-formation-monitoring"
   sku                 = "PerGB2018"
   retention_in_days   = 30
 }
@@ -146,15 +158,15 @@ resource "azurerm_log_analytics_workspace" "main" {
 ```hcl
 resource "azurerm_subnet" "bastion" {
   name                 = "AzureBastionSubnet"  # Nom imposé par Azure
-  resource_group_name  = module.hub.network_resource_group_name
-  virtual_network_name = module.hub.vnet_name
+  resource_group_name  = module.hub.resource_group_name
+  virtual_network_name = module.hub.vnet_hub_name
   address_prefixes     = ["10.0.0.0/26"]
 }
 
 resource "azurerm_bastion_host" "main" {
   name                = "bastion-formation-hub"
   location            = var.location
-  resource_group_name = module.hub.network_resource_group_name
+  resource_group_name = module.hub.resource_group_name
 
   ip_configuration {
     name                 = "configuration"
@@ -169,21 +181,46 @@ resource "azurerm_bastion_host" "main" {
 **Fonction :** Sécurité et gestion des secrets
 
 **Services recommandés :**
-- ✅ Azure Key Vault
+- ✅ Azure Key Vault (déjà créé)
 - ✅ Azure Sentinel (SIEM)
 - ✅ Azure Policy
 - ✅ Microsoft Defender for Cloud
 
-**Exemple Key Vault :**
+**Key Vault créé par le module :**
+
+- Nom : `kv-formation-security` via `var.key_vault_name`
+- SKU : `standard`
+- Soft delete : 7 jours
+- Purge protection : désactivée pour faciliter le nettoyage en lab
+- Access policy : l'identité Azure CLI/Terraform courante peut `Get`, `Set`, `List`, `Delete`, `Recover`, `Purge`
+
+Le module génère une paire SSH ED25519 avec `ssh-keygen` uniquement si le secret public n'existe pas déjà :
+
+- Secret public : `vm-admin-ssh-public-key`
+- Secret privé : `vm-admin-ssh-private-key`
+
+Pour récupérer la clé privée :
+
+```bash
+az keyvault secret download \
+  --vault-name kv-formation-security \
+  --name vm-admin-ssh-private-key \
+  --file ./vm_admin_key
+
+chmod 600 ./vm_admin_key
+```
+
+**Ressource Terraform :**
 ```hcl
 resource "azurerm_key_vault" "main" {
   name                = "kv-formation-security"
   location            = var.location
-  resource_group_name = module.hub.security_resource_group_name
+  resource_group_name = azurerm_resource_group.security.name
   tenant_id           = data.azurerm_client_config.current.tenant_id
   sku_name            = "standard"
 
-  enable_rbac_authorization = true
+  soft_delete_retention_days = 7
+  purge_protection_enabled   = false
 }
 ```
 
@@ -201,7 +238,7 @@ resource "azurerm_key_vault" "main" {
 resource "azurerm_container_registry" "main" {
   name                = "crformationdevops"
   location            = var.location
-  resource_group_name = module.hub.devops_resource_group_name
+  resource_group_name = "rg-formation-devops"
   sku                 = "Basic"
   admin_enabled       = false
 }
@@ -267,8 +304,8 @@ module "hub" {
 # Ajouter Bastion dans le VNet Hub
 resource "azurerm_subnet" "bastion" {
   name                 = "AzureBastionSubnet"
-  resource_group_name  = module.hub.network_resource_group_name
-  virtual_network_name = module.hub.vnet_name
+  resource_group_name  = module.hub.resource_group_name
+  virtual_network_name = module.hub.vnet_hub_name
   address_prefixes     = ["10.0.0.0/26"]
 }
 
@@ -289,8 +326,8 @@ module "hub" {
 # Ajouter Firewall subnet
 resource "azurerm_subnet" "firewall" {
   name                 = "AzureFirewallSubnet"  # Nom imposé
-  resource_group_name  = module.hub.network_resource_group_name
-  virtual_network_name = module.hub.vnet_name
+  resource_group_name  = module.hub.resource_group_name
+  virtual_network_name = module.hub.vnet_hub_name
   address_prefixes     = ["10.0.1.0/26"]
 }
 
@@ -332,7 +369,7 @@ Exemple Log Analytics :
 resource "azurerm_log_analytics_workspace" "main" {
   name                = "log-formation-monitoring"
   location            = var.location
-  resource_group_name = module.hub.monitoring_resource_group_name
+  resource_group_name = "rg-formation-monitoring"
   sku                 = "PerGB2018"
 }
 ```
