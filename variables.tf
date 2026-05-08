@@ -45,3 +45,38 @@ variable "ssh_private_key_secret_name" {
   type        = string
   default     = "vm-admin-ssh-private-key"
 }
+
+variable "vm_size" {
+  description = "Gabarit des VMs front et back"
+  type        = string
+  default     = "Standard_B2ts_v2"
+}
+
+variable "vm_count" {
+  description = "Nombre de VMs par service"
+  type = object({
+    front = number
+    back  = number
+  })
+  default = {
+    front = 1
+    back  = 1
+  }
+
+  validation {
+    condition     = var.vm_count.front >= 0 && var.vm_count.back >= 0
+    error_message = "vm_count.front et vm_count.back doivent etre superieurs ou egaux a 0."
+  }
+}
+
+variable "vm_environments" {
+  description = "Environnements cible pour le provisionning des VMs"
+  type        = list(string)
+  default     = ["dev"]
+}
+
+variable "vm_admin_username" {
+  description = "Utilisateur administrateur des VMs linux"
+  type        = string
+  default     = "azureuser"
+}

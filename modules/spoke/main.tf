@@ -58,6 +58,8 @@ resource "azurerm_subnet" "subnet-front" {
   resource_group_name  = azurerm_resource_group.main[each.key].name
   virtual_network_name = azurerm_virtual_network.main[each.key].name
   address_prefixes     = [local.subnets[each.key].front]
+
+  private_endpoint_network_policies = "Enabled"
 }
 
 resource "azurerm_subnet" "subnet-back" {
@@ -67,6 +69,8 @@ resource "azurerm_subnet" "subnet-back" {
   resource_group_name  = azurerm_resource_group.main[each.key].name
   virtual_network_name = azurerm_virtual_network.main[each.key].name
   address_prefixes     = [local.subnets[each.key].back]
+
+  private_endpoint_network_policies = "Enabled"
 }
 
 resource "azurerm_subnet" "subnet-data" {
@@ -76,4 +80,6 @@ resource "azurerm_subnet" "subnet-data" {
   resource_group_name  = azurerm_resource_group.main[each.key].name
   virtual_network_name = azurerm_virtual_network.main[each.key].name
   address_prefixes     = [local.subnets[each.key].data]
+
+  private_endpoint_network_policies = "Enabled"
 }

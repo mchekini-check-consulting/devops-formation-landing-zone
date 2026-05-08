@@ -21,5 +21,14 @@ module "spoke" {
   hub_resource_group_name = module.hub.resource_group_name
   location = var.location
   environments = var.environments
+
+  key_vault_id               = module.hub.key_vault_id
+  ssh_public_key_secret_name = var.ssh_public_key_secret_name
+
+  vm_size           = var.vm_size
+  vm_count          = var.vm_count
+  vm_environments   = var.vm_environments
+  vm_admin_username = var.vm_admin_username
+  
 }
 
