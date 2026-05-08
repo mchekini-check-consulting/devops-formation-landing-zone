@@ -28,3 +28,20 @@ variable "spoke_address_spaces" {
     prod = "10.3.0.0/16"
   }
 }
+
+variable "key_vault_name" {
+  description = "Nom du Key Vault"
+  type        = string
+}
+
+variable "ssh_public_key_secret_name" {
+  description = "Nom du secret contenant la cle publique SSH"
+  type        = string
+  default     = "vm-admin-ssh-public-key"
+}
+
+variable "ssh_private_key_secret_name" {
+  description = "Nom du secret contenant la cle privee SSH"
+  type        = string
+  default     = "vm-admin-ssh-private-key"
+}

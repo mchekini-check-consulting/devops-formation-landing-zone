@@ -3,6 +3,10 @@ module "hub" {
   team_name     = var.team_name
   location      = var.location
   address_space = var.hub_address_space
+
+  key_vault_name             = var.key_vault_name
+  ssh_public_key_secret_name = var.ssh_public_key_secret_name
+  ssh_private_key_secret_name = var.ssh_private_key_secret_name
 }
 
 
