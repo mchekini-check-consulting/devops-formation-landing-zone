@@ -31,3 +31,9 @@ variable "ssh_private_key_secret_name" {
 variable "readers_group_object_id" {
   type = string
 }
+
+variable "github_pat" {
+  description = "GitHub Personal Access Token pour le repo start-up-scritps"
+  type        = string
+  sensitive   = true
+}

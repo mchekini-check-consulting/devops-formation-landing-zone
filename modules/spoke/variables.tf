@@ -86,6 +86,12 @@ variable "vm_admin_username" {
   default     = "azureuser"
 }
 
+variable "github_pat" {
+  description = "GitHub Personal Access Token pour le repo start-up-scritps"
+  type        = string
+  sensitive   = true
+}
+
 variable "postgres_admin_login" {
   type        = string
   description = "Admin username for PostgreSQL"

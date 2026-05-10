@@ -8,6 +8,7 @@ module "hub" {
   ssh_public_key_secret_name = var.ssh_public_key_secret_name
   ssh_private_key_secret_name = var.ssh_private_key_secret_name
   readers_group_object_id = var.readers_group_object_id
+  github_pat              = var.github_pat
 }
 
 
@@ -32,5 +33,7 @@ module "spoke" {
   vm_admin_username = var.vm_admin_username
 
   acr_id = module.hub.acr_id
+
+  github_pat = var.github_pat
 }
 
