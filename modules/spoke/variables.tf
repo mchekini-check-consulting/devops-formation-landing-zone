@@ -85,3 +85,74 @@ variable "vm_admin_username" {
   type        = string
   default     = "azureuser"
 }
+
+variable "postgres_admin_login" {
+  type        = string
+  description = "Admin username for PostgreSQL"
+  sensitive   = true
+  default     = "formation"
+}
+
+variable "postgres_admin_password" {
+  type        = string
+  description = "Admin password for PostgreSQL"
+  sensitive   = true
+  default     = "test"
+}
+
+variable "postgres_server_name" {
+  type        = string
+  description = "PostgreSQL flexible server name prefix"
+  default     = "data-pgsql"
+}
+
+variable "postgres_sku_name" {
+  type        = string
+  description = "SKU for PostgreSQL flexible server"
+  default     = "B_Standard_B1ms"
+
+  validation {
+    condition     = can(regex("^(B|GP|MO)_", var.postgres_sku_name))
+    error_message = "postgres_sku_name must start with B_, GP_, or MO_ for Flexible Server."
+  }
+}
+
+variable "postgres_version" {
+  type        = string
+  description = "PostgreSQL version"
+  default     = "15"
+}
+
+variable "postgres_storage_mb" {
+  type        = number
+  description = "Storage size in MB for PostgreSQL"
+  default     = 32768
+}
+
+variable "postgres_backup_retention_days" {
+  type        = number
+  description = "Backup retention in days"
+  default     = 7
+}
+
+variable "postgres_databases" {
+  type = map(object({
+    charset   = string
+    collation = string
+  }))
+  description = "Map of databases to create"
+  default = {
+    "order" = {
+      charset   = "UTF8"
+      collation = "en_US.utf8"
+    }
+    "payment" = {
+      charset   = "UTF8"
+      collation = "en_US.utf8"
+    }
+    "catalogue" = {
+      charset   = "UTF8"
+      collation = "en_US.utf8"
+    }
+  }
+}

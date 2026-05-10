@@ -141,3 +141,20 @@ resource "azurerm_linux_virtual_machine" "vm" {
     Tier        = each.value.tier
   })
 }
+
+#--------------------------------------------------------------
+# Extension AAD SSH Login
+#--------------------------------------------------------------
+resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
+  for_each = local.vm_instances
+
+  name                 = "AADSSHLoginForLinux"
+  virtual_machine_id   = azurerm_linux_virtual_machine.vm[each.key].id
+  publisher            = "Microsoft.Azure.ActiveDirectory"
+  type                 = "AADSSHLoginForLinux"
+  type_handler_version = "1.0"
+
+  tags = merge(local.common_tags, {
+    Environment = each.value.env
+  })
+}

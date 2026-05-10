@@ -11,8 +11,8 @@ variable "location" {
 
 variable "environments" {
   description = "Liste des environnements"
-  type = list(string)
-  default = ["dev", "qua", "prod"]
+  type        = list(string)
+  default     = ["dev"]
 }
 
 variable "hub_address_space" {
