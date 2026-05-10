@@ -12,6 +12,9 @@ Ce module crée pour chaque environnement :
 - ✅ 3 Subnets (frontend, backend, data)
 - ✅ 3 Network Security Groups avec règles
 - ✅ 2 VNet Peerings (Hub ↔ Spoke)
+- ✅ Des NICs privées pour les VMs front/back des environnements ciblés
+- ✅ Des VMs Linux Ubuntu avec Docker installé via cloud-init
+- ✅ 1 Managed Identity avec rôle AcrPull sur l'ACR du Hub
 
 ## 🏗️ Architecture
 
@@ -22,7 +25,9 @@ Spoke "ecom" avec 3 environnements
 │   ├── rg-formation-ecom-dev
 │   ├── vnet-formation-ecom-dev
 │   ├── subnet-front-dev (10.1.0.0/24) + NSG
+│   │   └── vm-formation-ecom-front-dev-01 + NIC privée
 │   ├── subnet-back-dev (10.1.1.0/24) + NSG
+│   │   └── vm-formation-ecom-back-dev-01 + NIC privée
 │   └── subnet-data-dev (10.1.2.0/24) + NSG
 │
 ├── Qua (10.2.0.0/16)
@@ -39,6 +44,8 @@ modules/spoke/
 ├── main.tf         # Resource Groups + VNets + Subnets
 ├── nsg.tf          # Network Security Groups et règles
 ├── peering.tf      # VNet Peering Hub ↔ Spoke
+├── vm.tf           # NICs + VMs Linux + cloud-init Docker
+├── acr-access.tf   # Managed Identity + Role Assignment AcrPull
 ├── variables.tf    # Variables d'entrée
 ├── outputs.tf      # Outputs
 └── README.md       # Ce fichier
@@ -61,9 +68,17 @@ module "ecom" {
     qua  = "10.2.0.0/16"
     prod = "10.3.0.0/16"
   }
-  hub_vnet_id             = module.hub.vnet_id
-  hub_vnet_name           = module.hub.vnet_name
-  hub_resource_group_name = module.hub.network_resource_group_name
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name = module.hub.resource_group_name
+
+  key_vault_id               = module.hub.key_vault_id
+  ssh_public_key_secret_name = "vm-admin-ssh-public-key"
+
+  vm_size           = "Standard_B2ts_v2"
+  vm_count          = { front = 1, back = 1 }
+  vm_environments   = ["dev"]
+  vm_admin_username = "azureuser"
 }
 ```
 
@@ -81,9 +96,11 @@ module "analytics" {
     dev  = "10.4.0.0/16"
     prod = "10.5.0.0/16"
   }
-  hub_vnet_id             = module.hub.vnet_id
-  hub_vnet_name           = module.hub.vnet_name
-  hub_resource_group_name = module.hub.network_resource_group_name
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name    = module.hub.resource_group_name
+  key_vault_id               = module.hub.key_vault_id
+  ssh_public_key_secret_name = "vm-admin-ssh-public-key"
 
   tags = {
     CostCenter = "Marketing"
@@ -104,6 +121,13 @@ module "analytics" {
 | `hub_vnet_id` | ID du VNet Hub | `string` | - | ✅ |
 | `hub_vnet_name` | Nom du VNet Hub | `string` | - | ✅ |
 | `hub_resource_group_name` | Nom du RG réseau du Hub | `string` | - | ✅ |
+| `key_vault_id` | ID du Key Vault contenant la clé publique SSH | `string` | - | ✅ |
+| `ssh_public_key_secret_name` | Nom du secret contenant la clé publique SSH | `string` | - | ✅ |
+| `vm_size` | Taille des VMs front/back | `string` | `"Standard_B2ts_v2"` | ❌ |
+| `vm_count` | Nombre de VMs par service front/back | `object` | `{ front = 1, back = 1 }` | ❌ |
+| `vm_environments` | Environnements où créer les VMs | `list(string)` | `["dev"]` | ❌ |
+| `vm_admin_username` | Utilisateur admin Linux | `string` | `"azureuser"` | ❌ |
+| `acr_id` | ID de l'ACR du Hub pour les role assignments | `string` | - | ✅ |
 | `tags` | Tags additionnels | `map(string)` | `{}` | ❌ |
 
 ## 📤 Outputs
@@ -169,6 +193,14 @@ Data:     cidrsubnet("10.1.0.0/16", 8, 2) → 10.1.2.0/24
 | Qua | 10.2.0.0/16 | 10.2.0.0/24 | 10.2.1.0/24 | 10.2.2.0/24 |
 | Prod | 10.3.0.0/16 | 10.3.0.0/24 | 10.3.1.0/24 | 10.3.2.0/24 |
 
+Chaque subnet définit explicitement :
+
+```hcl
+private_endpoint_network_policies = "Enabled"
+```
+
+Ce réglage conserve le comportement existant côté Azure et évite qu'une valeur par défaut du provider déclenche des updates de subnets non souhaitées.
+
 ## 📦 Ressources Créées
 
 Pour **1 Spoke avec 3 environnements** (dev, qua, prod) :
@@ -180,7 +212,111 @@ Pour **1 Spoke avec 3 environnements** (dev, qua, prod) :
 9 × NSG (3 par environnement)
 ~27 × Règles NSG
 6 × VNet Peerings (2 par environnement)
+3 × Managed Identities (1 par environnement)
+3 × Role Assignments AcrPull (1 par environnement)
+2 × NICs privées si vm_count = { front = 1, back = 1 } et vm_environments = ["dev"]
+2 × VMs Linux privées dans les subnets front/back de dev
 ```
+
+## 🖥️ VMs, NICs et cloud-init
+
+Les VMs sont créées à partir de `local.vm_instances`, calculé avec :
+
+- `vm_environments` : environnements où provisionner des VMs
+- `vm_count.front` : nombre de VMs frontend par environnement
+- `vm_count.back` : nombre de VMs backend par environnement
+
+Le module exclut volontairement `prod` des VMs générées par ce bloc, même si `prod` est présent dans `vm_environments`.
+
+### Nommage
+
+```text
+Frontend VM : vm-formation-ecom-front-dev-01
+Backend VM  : vm-formation-ecom-back-dev-01
+Frontend NIC: nic-formation-ecom-front-dev-01
+Backend NIC : nic-formation-ecom-back-dev-01
+```
+
+### Réseau
+
+- Les NICs utilisent une IP privée dynamique.
+- Aucune Public IP n'est créée.
+- La VM front est attachée au subnet front.
+- La VM back est attachée au subnet back.
+- L'accès SSH direct depuis Internet n'est pas possible sans Bastion, VPN, jumpbox ou autre accès au VNet.
+
+### Image et taille
+
+```hcl
+vm_size = "Standard_B2ts_v2"
+
+source_image_reference {
+  publisher = "Canonical"
+  offer     = "0001-com-ubuntu-server-jammy"
+  sku       = "22_04-lts-gen2"
+  version   = "latest"
+}
+```
+
+`vm_size` définit le hardware Azure. `source_image_reference` définit l'OS. Ici, les VMs sont des Ubuntu 22.04 Gen2.
+
+### SSH
+
+Le module lit la clé publique depuis Key Vault :
+
+```hcl
+data "azurerm_key_vault_secret" "admin_ssh_public_key" {
+  name         = var.ssh_public_key_secret_name
+  key_vault_id = var.key_vault_id
+}
+```
+
+L'authentification password est désactivée :
+
+```hcl
+disable_password_authentication = true
+```
+
+### Docker
+
+Docker est installé au premier boot via `custom_data` cloud-init :
+
+- ajout du dépôt officiel Docker Ubuntu
+- installation de `docker-ce`, `docker-ce-cli`, `containerd.io`, Buildx et Compose plugin
+- activation du service Docker
+- ajout de `vm_admin_username` au groupe `docker`
+
+Pour vérifier l'installation :
+
+```bash
+az vm run-command invoke \
+  -g rg-formation-ecom-dev \
+  -n vm-formation-ecom-front-dev-01 \
+  --command-id RunShellScript \
+  --scripts "cloud-init status --long; docker --version; systemctl is-active docker; groups azureuser"
+```
+
+Pour lire les logs cloud-init :
+
+```bash
+az vm run-command invoke \
+  -g rg-formation-ecom-dev \
+  -n vm-formation-ecom-front-dev-01 \
+  --command-id RunShellScript \
+  --scripts "sudo tail -n 120 /var/log/cloud-init-output.log"
+```
+
+### Remplacer les VMs après modification du custom_data
+
+`custom_data` force le remplacement de la VM. Pour recréer seulement les VMs front/back :
+
+```bash
+terraform apply \
+  -replace='module.spoke.azurerm_linux_virtual_machine.vm["dev-front-01"]' \
+  -replace='module.spoke.azurerm_linux_virtual_machine.vm["dev-back-01"]'
+```
+
+Les NICs peuvent rester en place si seul le script de boot change.
 
 ## 🔄 VNet Peering
 

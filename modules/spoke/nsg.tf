@@ -88,16 +88,49 @@ resource "azurerm_network_security_group" "back" {
   })
 }
 
-resource "azurerm_network_security_rule" "back_from_front" {
+resource "azurerm_network_security_rule" "back-payments_from_front" {
   for_each = toset(var.environments)
 
-  name                        = "Allow-From-Frontend"
+  name                        = "Allow-Payments-From-Frontend"
   priority                    = 100
   direction                   = "Inbound"
   access                      = "Allow"
   protocol                    = "Tcp"
   source_port_range           = "*"
-  destination_port_range      = "8080"
+  destination_port_range      = "8082"
+  source_address_prefix       = local.subnets[each.key].front
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main[each.key].name
+  network_security_group_name = azurerm_network_security_group.back[each.key].name
+}
+
+resource "azurerm_network_security_rule" "back_orders_from_front" {
+  for_each = toset(var.environments)
+
+  name                        = "Allow-Orders-From-Frontend"
+  priority                    = 101
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "8000"
+  source_address_prefix       = local.subnets[each.key].front
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main[each.key].name
+  network_security_group_name = azurerm_network_security_group.back[each.key].name
+}
+
+
+resource "azurerm_network_security_rule" "back_catalog_from_front" {
+  for_each = toset(var.environments)
+
+  name                        = "Allow-Catalog-From-Frontend"
+  priority                    = 102
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "4000"
   source_address_prefix       = local.subnets[each.key].front
   destination_address_prefix  = "*"
   resource_group_name         = azurerm_resource_group.main[each.key].name

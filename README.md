@@ -25,11 +25,15 @@ Cette Landing Zone implémente une architecture **Hub & Spoke** sur Azure :
 - **N Spokes** : Un par projet, avec plusieurs environnements (dev, qua, prod)
 - **Network Security Groups** : Sécurisation des flux réseau par tier
 - **VNet Peering** : Connectivité Hub ↔ Spokes
+- **Key Vault** : Stockage centralisé de la paire de clés SSH des VMs
+- **VMs Linux privées** : Frontend/backend en dev avec Docker installé via cloud-init
 
 ### 🎯 Objectifs
 
 ✅ **Isolation** : Chaque projet a son propre réseau et environnements
 ✅ **Sécurité** : NSG par subnet avec règles différenciées dev/prod
+✅ **Secrets** : Clés SSH générées et stockées dans Azure Key Vault
+✅ **Compute** : VMs Ubuntu privées prêtes pour Docker
 ✅ **Scalabilité** : Ajout facile de nouveaux projets
 ✅ **Gouvernance** : Nomenclature cohérente et tags standards
 ✅ **Automation** : Infrastructure as Code avec Terraform
@@ -48,6 +52,7 @@ Cette Landing Zone implémente une architecture **Hub & Spoke** sur Azure :
 │  │  (RG)        │  │  (RG)    │  │  (RG)    │  │  (RG)   │ │
 │  └──────────────┘  └──────────┘  └──────────┘  └─────────┘ │
 │         VNet Hub : vnet-formation-hub                       │
+│         Key Vault : kv-formation-security                    │
 └───────────────────────┬─────────────────────────────────────┘
                         │ VNet Peering
         ┌───────────────┼───────────────┐
@@ -80,6 +85,8 @@ Cette Landing Zone implémente une architecture **Hub & Spoke** sur Azure :
 │  ┌────────────────────────────────────────────────────┐    │
 │  │  Subnet Frontend (10.1.0.0/24)                     │    │
 │  │  NSG: nsg-formation-ecom-front-dev                 │    │
+│  │  VM: vm-formation-ecom-front-dev-01                │    │
+│  │  NIC: nic-formation-ecom-front-dev-01              │    │
 │  │  • HTTP/HTTPS: * → 80,443                          │    │
 │  │  • SSH: * → 22 (dev/qua uniquement)                │    │
 │  └────────────────────────────────────────────────────┘    │
@@ -87,6 +94,8 @@ Cette Landing Zone implémente une architecture **Hub & Spoke** sur Azure :
 │  ┌────────────────────────────────────────────────────┐    │
 │  │  Subnet Backend (10.1.1.0/24)                      │    │
 │  │  NSG: nsg-formation-ecom-backend-dev               │    │
+│  │  VM: vm-formation-ecom-back-dev-01                 │    │
+│  │  NIC: nic-formation-ecom-back-dev-01               │    │
 │  │  • API: 10.1.0.0/24 → 8080                         │    │
 │  │  • SSH: * → 22 (dev/qua uniquement)                │    │
 │  └────────────────────────────────────────────────────┘    │
@@ -121,6 +130,7 @@ terraform-azure/
 ├── modules/
 │   ├── hub/                    # Module Hub
 │   │   ├── main.tf            # Resource Groups
+│   │   ├── keyvault.tf        # Key Vault + génération clés SSH
 │   │   ├── variables.tf
 │   │   └── outputs.tf
 │   │
@@ -128,6 +138,8 @@ terraform-azure/
 │       ├── main.tf            # Resource Groups + VNets + Subnets
 │       ├── nsg.tf             # Network Security Groups
 │       ├── peering.tf         # VNet Peering Hub ↔ Spoke
+│       ├── acr-access.tf     # Managed Identity + AcrPull
+│       ├── vm.tf              # NICs + VMs Linux + cloud-init Docker
 │       ├── variables.tf
 │       └── outputs.tf
 │
@@ -178,6 +190,9 @@ az account show
 
 # (Optionnel) Changer d'abonnement
 az account set --subscription "SUBSCRIPTION_ID"
+
+# AzureRM v4 demande un subscription ID explicite
+export ARM_SUBSCRIPTION_ID="$(az account show --query id -o tsv)"
 ```
 
 ---
@@ -198,6 +213,17 @@ cd terraform-azure
 ```hcl
 team_name = "formation"
 location  = "francecentral"
+
+key_vault_name              = "kv-formation-security"
+ssh_public_key_secret_name  = "vm-admin-ssh-public-key"
+ssh_private_key_secret_name = "vm-admin-ssh-private-key"
+
+vm_size = "Standard_B2ts_v2"
+vm_count = {
+  front = 1
+  back  = 1
+}
+vm_environments = ["dev"]
 ```
 
 ### 3. Initialiser Terraform
@@ -226,6 +252,9 @@ az group list --query "[?starts_with(name, 'rg-formation')].name" -o table
 
 # Vérifier les VNets
 az network vnet list --query "[?starts_with(name, 'vnet-formation')].{Name:name, AddressSpace:addressSpace.addressPrefixes[0]}" -o table
+
+# Vérifier les VMs
+az vm list -g rg-formation-ecom-dev -d -o table
 ```
 
 ---
@@ -241,6 +270,13 @@ az network vnet list --query "[?starts_with(name, 'vnet-formation')].{Name:name,
 | `environments` | Liste des environnements | `list(string)` | `["dev", "qua", "prod"]` |
 | `hub_address_space` | Plage IP du Hub | `string` | `"10.0.0.0/16"` |
 | `spoke_address_spaces` | Plages IP des Spokes | `map(string)` | Voir ci-dessous |
+| `key_vault_name` | Nom du Key Vault pour les clés SSH | `string` | - |
+| `ssh_public_key_secret_name` | Secret Key Vault contenant la clé publique SSH | `string` | `"vm-admin-ssh-public-key"` |
+| `ssh_private_key_secret_name` | Secret Key Vault contenant la clé privée SSH | `string` | `"vm-admin-ssh-private-key"` |
+| `vm_size` | Taille des VMs Linux | `string` | `"Standard_B2ts_v2"` |
+| `vm_count` | Nombre de VMs front/back | `object` | `{ front = 1, back = 1 }` |
+| `vm_environments` | Environnements où créer les VMs | `list(string)` | `["dev"]` |
+| `vm_admin_username` | Utilisateur admin Linux | `string` | `"azureuser"` |
 
 ### Plan d'adressage IP par défaut
 
@@ -257,6 +293,8 @@ Chaque environnement est subdivisé en 3 subnets :
 - Backend : `10.x.1.0/24`
 - Data : `10.x.2.0/24`
 
+Les subnets gardent `private_endpoint_network_policies = "Enabled"` explicitement afin d'éviter qu'un changement de valeur par défaut du provider AzureRM modifie ce comportement réseau sans intention.
+
 ---
 
 ## 📦 Modules
@@ -266,6 +304,9 @@ Chaque environnement est subdivisé en 3 subnets :
 Crée les ressources partagées :
 - 4 Resource Groups (monitoring, network, security, devops)
 - 1 VNet Hub (10.0.0.0/16)
+- 1 Key Vault pour les clés SSH des VMs
+- 1 paire de clés SSH ED25519 générée si elle n'existe pas déjà
+- 1 Azure Container Registry (ACR) Standard avec authentification obligatoire (dans le RG DevOps)
 
 **Utilisation :**
 ```hcl
@@ -275,6 +316,10 @@ module "hub" {
   team_name     = var.team_name
   location      = var.location
   address_space = var.hub_address_space
+
+  key_vault_name              = var.key_vault_name
+  ssh_public_key_secret_name  = var.ssh_public_key_secret_name
+  ssh_private_key_secret_name = var.ssh_private_key_secret_name
 }
 ```
 
@@ -286,6 +331,9 @@ Crée un projet avec ses environnements :
 - 3N Subnets (3 par environnement)
 - 3N NSG (3 par environnement)
 - 2N VNet Peerings (2 par environnement)
+- N Managed Identities avec rôle AcrPull (1 par environnement)
+- NICs privées pour les VMs front/back
+- VMs Ubuntu 22.04 Gen2 avec Docker installé via cloud-init
 
 **Utilisation :**
 ```hcl
@@ -297,10 +345,75 @@ module "ecom" {
   location                = var.location
   environments            = var.environments
   address_spaces          = var.spoke_address_spaces
-  hub_vnet_id             = module.hub.vnet_id
-  hub_vnet_name           = module.hub.vnet_name
-  hub_resource_group_name = module.hub.network_resource_group_name
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name = module.hub.resource_group_name
+
+  key_vault_id               = module.hub.key_vault_id
+  ssh_public_key_secret_name = var.ssh_public_key_secret_name
+
+  vm_size           = var.vm_size
+  vm_count          = var.vm_count
+  vm_environments   = var.vm_environments
+  vm_admin_username = var.vm_admin_username
 }
+```
+
+---
+
+## 🖥️ VMs Linux et Docker
+
+Le module Spoke peut créer des VMs Linux par environnement cible. Par défaut, seules les VMs de `dev` sont créées :
+
+- `vm-formation-ecom-front-dev-01` dans `subnet-front-dev`
+- `vm-formation-ecom-back-dev-01` dans `subnet-back-dev`
+- NICs privées associées, sans IP publique
+- Image Ubuntu `22_04-lts-gen2`
+- Taille par défaut `Standard_B2ts_v2`
+- Authentification SSH par clé uniquement
+- Docker installé au premier boot via `custom_data` cloud-init
+
+Les VMs n'ont pas d'IP publique. L'accès SSH direct depuis Internet n'est donc pas possible sans Bastion, VPN, jumpbox ou autre chemin réseau privé.
+
+### Vérifier les VMs et IP privées
+
+```bash
+az vm list -g rg-formation-ecom-dev -d -o table
+
+az network nic list \
+  -g rg-formation-ecom-dev \
+  --query "[].{name:name,privateIp:ipConfigurations[0].privateIPAddress}" \
+  -o table
+```
+
+### Vérifier cloud-init et Docker
+
+```bash
+az vm run-command invoke \
+  -g rg-formation-ecom-dev \
+  -n vm-formation-ecom-front-dev-01 \
+  --command-id RunShellScript \
+  --scripts "cloud-init status --long; docker --version; systemctl is-active docker; groups azureuser"
+```
+
+Pour inspecter les logs cloud-init :
+
+```bash
+az vm run-command invoke \
+  -g rg-formation-ecom-dev \
+  -n vm-formation-ecom-front-dev-01 \
+  --command-id RunShellScript \
+  --scripts "sudo tail -n 120 /var/log/cloud-init-output.log"
+```
+
+### Recréer les VMs après changement du custom_data
+
+Azure ne rejoue pas `custom_data` sur une VM existante. Si le script cloud-init change, remplacer les VMs :
+
+```bash
+terraform apply \
+  -replace='module.spoke.azurerm_linux_virtual_machine.vm["dev-front-01"]' \
+  -replace='module.spoke.azurerm_linux_virtual_machine.vm["dev-back-01"]'
 ```
 
 ---
@@ -336,6 +449,36 @@ Chaque subnet a son propre NSG avec des règles spécifiques :
 3. **Activer Azure Defender** pour la protection avancée
 4. **Configurer Azure Monitor** pour la surveillance
 5. **Utiliser Azure Key Vault** pour les secrets
+
+### Clés SSH
+
+La paire SSH est générée en ED25519 par le module Hub et stockée dans Key Vault :
+
+- Clé publique : `vm-admin-ssh-public-key`
+- Clé privée : `vm-admin-ssh-private-key`
+
+Pour télécharger la clé privée si vous avez un chemin réseau vers la VM :
+
+```bash
+KV_NAME=$(terraform output -raw key_vault_name)
+
+az keyvault secret download \
+  --vault-name "$KV_NAME" \
+  --name vm-admin-ssh-private-key \
+  --file ./vm_admin_key
+
+chmod 600 ./vm_admin_key
+```
+
+Puis depuis un poste qui a accès au VNet :
+
+```bash
+ssh -i ./vm_admin_key azureuser@<PRIVATE_IP>
+```
+
+### Provider AzureRM
+
+Le projet utilise AzureRM `~> 4.0` afin de supporter les clés SSH `ssh-ed25519` sur `azurerm_linux_virtual_machine`. AzureRM v4 demande un subscription ID explicite via `ARM_SUBSCRIPTION_ID` ou configuration provider.
 
 ---
 
@@ -395,9 +538,11 @@ module "analytics" {
   location                = var.location
   environments            = var.environments
   address_spaces          = var.spoke_address_spaces
-  hub_vnet_id             = module.hub.vnet_id
-  hub_vnet_name           = module.hub.vnet_name
-  hub_resource_group_name = module.hub.network_resource_group_name
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name    = module.hub.resource_group_name
+  key_vault_id               = module.hub.key_vault_id
+  ssh_public_key_secret_name = var.ssh_public_key_secret_name
 }
 ```
 
@@ -413,6 +558,7 @@ Cela créera automatiquement :
 - 3 VNets avec leurs subnets
 - 9 NSG (3 par environnement)
 - 6 VNet Peerings
+- Les VMs front/back selon `vm_count` et `vm_environments`
 
 ---
 
@@ -443,10 +589,11 @@ Cette Landing Zone de base est **quasi-gratuite** :
 | Subnets | 🆓 Gratuit |
 | NSG | 🆓 Gratuit |
 | VNet Peering (même région) | 🆓 Gratuit |
+| Key Vault | Faible coût selon opérations |
+| VMs `Standard_B2ts_v2` | Payant tant que les VMs tournent |
+| Disques OS managés | Payant |
 
-**Total estimé : 0€/mois**
-
-Les coûts réels dépendront des ressources déployées (VMs, App Services, bases de données, etc.).
+Les coûts réels dépendent surtout des VMs, des disques et des services ajoutés.
 
 
 ---
