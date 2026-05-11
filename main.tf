@@ -7,6 +7,7 @@ module "hub" {
   key_vault_name             = var.key_vault_name
   ssh_public_key_secret_name = var.ssh_public_key_secret_name
   ssh_private_key_secret_name = var.ssh_private_key_secret_name
+  readers_group_object_id = var.readers_group_object_id
 }
 
 

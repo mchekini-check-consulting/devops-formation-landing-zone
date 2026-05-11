@@ -1,3 +1,7 @@
+locals {
+  terraform_secret_permissions = ["Get", "Set", "List", "Delete", "Recover", "Purge"]
+}
+
 data "azurerm_client_config" "current" {}
 
 resource "null_resource" "generate_ssh_key_in_vault" {
@@ -59,18 +63,11 @@ resource "azurerm_key_vault" "main" {
   soft_delete_retention_days = 7
   purge_protection_enabled   = false
 
-  access_policy {
-    tenant_id = data.azurerm_client_config.current.tenant_id
-    object_id = data.azurerm_client_config.current.object_id
 
-    secret_permissions = [
-      "Get",
-      "Set",
-      "List",
-      "Delete",
-      "Recover",
-      "Purge"
-    ]
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = var.readers_group_object_id
+    secret_permissions = local.terraform_secret_permissions 
   }
 
   tags = merge(local.common_tags, {
