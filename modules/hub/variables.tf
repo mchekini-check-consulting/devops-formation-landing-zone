@@ -27,3 +27,7 @@ variable "ssh_public_key_secret_name" {
 variable "ssh_private_key_secret_name" {
   type = string
 }
+
+variable "readers_group_object_id" {
+  type = string
+}

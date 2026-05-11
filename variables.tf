@@ -80,3 +80,8 @@ variable "vm_admin_username" {
   type        = string
   default     = "azureuser"
 }
+
+variable "readers_group_object_id" {
+  description = "Object ID du groupe Azure AD qui doit accéder aux secrets"
+  type        = string
+}
