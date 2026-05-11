@@ -26,6 +26,7 @@ locals {
       - lsb-release
       - jq
     runcmd:
+      - while fuser /var/lib/dpkg/lock-frontend >/dev/null 2>&1; do sleep 5; done
       - install -m 0755 -d /etc/apt/keyrings
       - curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.asc
       - cat /tmp/docker.asc | gpg --dearmor -o /etc/apt/keyrings/docker.gpg
@@ -37,12 +38,9 @@ locals {
       - systemctl start docker
       - usermod -aG docker ${var.vm_admin_username}
       - |
-        REPO="juba-touam/start-up-scritps"
-        BRANCH="main"
         for FILE in create-service.sh deploy.sh docker-compose.back.yaml docker-compose.front.yaml nginx-proxy.conf; do
           curl -sL \
-            -H "Authorization: token ${var.github_pat}" \
-            "https://raw.githubusercontent.com/$REPO/$BRANCH/$FILE" \
+            "https://raw.githubusercontent.com/juba-touam/start-up-scritps/main/$FILE" \
             -o "/home/${var.vm_admin_username}/$FILE"
         done
       - chmod +x /home/${var.vm_admin_username}/*.sh

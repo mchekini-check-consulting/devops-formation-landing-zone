@@ -85,9 +85,3 @@ variable "readers_group_object_id" {
   description = "Object ID du groupe Azure AD qui doit accéder aux secrets"
   type        = string
 }
-
-variable "github_pat" {
-  description = "GitHub Personal Access Token (fine-grained, lecture seule sur le repo start-up-scritps)"
-  type        = string
-  sensitive   = true
-}

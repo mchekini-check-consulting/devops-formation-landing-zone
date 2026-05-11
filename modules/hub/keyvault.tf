@@ -74,9 +74,3 @@ resource "azurerm_key_vault" "main" {
     Function = "security"
   })
 }
-
-resource "azurerm_key_vault_secret" "github_pat" {
-  name         = "github-pat"
-  value        = var.github_pat
-  key_vault_id = azurerm_key_vault.main.id
-}
