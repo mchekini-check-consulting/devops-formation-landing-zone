@@ -106,3 +106,18 @@ resource "azurerm_linux_virtual_machine" "keycloak" {
 
   tags = merge(local.common_tags, { Function = "keycloak" })
 }
+
+#--------------------------------------------------------------
+# Extension AAD SSH Login
+#--------------------------------------------------------------
+resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
+  name                 = "AADSSHLoginForLinux"
+  virtual_machine_id   = azurerm_linux_virtual_machine.keycloak.id
+  publisher            = "Microsoft.Azure.ActiveDirectory"
+  type                 = "AADSSHLoginForLinux"
+  type_handler_version = "1.0"
+
+  tags = merge(local.common_tags, {
+    Function = "keycloak"
+  })
+}
