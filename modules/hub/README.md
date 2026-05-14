@@ -8,15 +8,11 @@ Le Hub centralise les **services partagés** utilisés par tous les Spokes (proj
 
 Ce module crée :
 - ✅ 4 Resource Groups (monitoring, network, security, devops)
-<<<<<<< HEAD
-- ✅ 1 VNet Hub
+- ✅ 1 VNet Hub avec 1 Subnet APIM (10.0.0.0/24)
 - ✅ 1 Azure Container Registry (ACR) Standard avec authentification obligatoire (dans le RG DevOps)
 - ✅ 1 Azure Key Vault dans le RG security
 - ✅ 1 paire de clés SSH ED25519 générée et stockée dans Key Vault
-=======
-- ✅ 1 VNet Hub avec 1 Subnet APIM (10.0.0.0/24)
 - ✅ 1 Azure API Management (Developer, External) dans le RG DevOps
->>>>>>> 187da20 (docs: update README with APIM documentation)
 - ✅ Infrastructure prête pour les services partagés
 
 ## 🏗️ Architecture
@@ -40,27 +36,19 @@ Hub (10.0.0.0/16)
 │       └── vm-admin-ssh-private-key
 │
 └── rg-formation-devops       # DevOps
-<<<<<<< HEAD
     ├── crformation (ACR Standard, authentification requise)
-    └── Artifact Store (à déployer)
-=======
     ├── apim-formation (API Management, External)
-    └── Container Registry, Artifact Store (à déployer)
->>>>>>> 187da20 (docs: update README with APIM documentation)
+    └── Artifact Store (à déployer)
 ```
 
 ## 📁 Structure du Module
 
 ```
 modules/hub/
-<<<<<<< HEAD
-├── main.tf         # Resource Groups + VNet Hub
+├── main.tf         # Resource Groups + VNet Hub + Subnet APIM
 ├── acr.tf          # Azure Container Registry
 ├── keyvault.tf     # Key Vault + génération clés SSH
-=======
-├── main.tf         # Resource Groups + VNet Hub + Subnet APIM
 ├── apim.tf         # Azure API Management
->>>>>>> 187da20 (docs: update README with APIM documentation)
 ├── variables.tf    # Variables d'entrée
 ├── outputs.tf      # Outputs (vnet_hub_id, acr_id, acr_login_server)
 └── README.md       # Ce fichier
@@ -125,7 +113,6 @@ module "hub" {
 | `monitoring_resource_group_name` | Nom du RG monitoring |
 | `security_resource_group_name` | Nom du RG security |
 | `devops_resource_group_name` | Nom du RG devops |
-<<<<<<< HEAD
 | `acr_login_server` | URL du registre ACR pour pull les images |
 | `acr_id` | ID de l'ACR pour les role assignments RBAC |
 | `vnet_hub_id` | ID du VNet Hub |
@@ -133,9 +120,7 @@ module "hub" {
 | `resource_group_name` | Nom du RG réseau (pour peering) |
 | `key_vault_id` | ID du Key Vault |
 | `key_vault_name` | Nom du Key Vault |
-=======
 | `apim_public_ip` | IP publique de l'APIM pour les tests depuis le navigateur |
->>>>>>> 187da20 (docs: update README with APIM documentation)
 
 ### Exemple d'utilisation des outputs
 
@@ -268,7 +253,6 @@ resource "azurerm_key_vault" "main" {
 - ✅ Azure DevOps Artifacts
 - ✅ Self-hosted agents
 
-<<<<<<< HEAD
 **Exemple Container Registry :**
 ```hcl
 resource "azurerm_container_registry" "main" {
@@ -279,9 +263,6 @@ resource "azurerm_container_registry" "main" {
   admin_enabled       = false
 }
 ```
-
-=======
->>>>>>> 187da20 (docs: update README with APIM documentation)
 ## 🗺️ Plan d'Adressage
 
 ### VNet Hub par défaut

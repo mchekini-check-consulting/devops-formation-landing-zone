@@ -270,7 +270,6 @@ az vm list -g rg-formation-ecom-dev -d -o table
 | `environments` | Liste des environnements | `list(string)` | `["dev", "qua", "prod"]` |
 | `hub_address_space` | Plage IP du Hub | `string` | `"10.0.0.0/16"` |
 | `spoke_address_spaces` | Plages IP des Spokes | `map(string)` | Voir ci-dessous |
-<<<<<<< HEAD
 | `key_vault_name` | Nom du Key Vault pour les clés SSH | `string` | - |
 | `ssh_public_key_secret_name` | Secret Key Vault contenant la clé publique SSH | `string` | `"vm-admin-ssh-public-key"` |
 | `ssh_private_key_secret_name` | Secret Key Vault contenant la clé privée SSH | `string` | `"vm-admin-ssh-private-key"` |
@@ -278,9 +277,7 @@ az vm list -g rg-formation-ecom-dev -d -o table
 | `vm_count` | Nombre de VMs front/back | `object` | `{ front = 1, back = 1 }` |
 | `vm_environments` | Environnements où créer les VMs | `list(string)` | `["dev"]` |
 | `vm_admin_username` | Utilisateur admin Linux | `string` | `"azureuser"` |
-=======
 | `apim_publisher_email` | Email du publisher pour l'APIM | `string` | `"devops@formation.com"` |
->>>>>>> 187da20 (docs: update README with APIM documentation)
 
 ### Plan d'adressage IP par défaut
 
@@ -307,15 +304,12 @@ Les subnets gardent `private_endpoint_network_policies = "Enabled"` explicitemen
 
 Crée les ressources partagées :
 - 4 Resource Groups (monitoring, network, security, devops)
-<<<<<<< HEAD
 - 1 VNet Hub (10.0.0.0/16)
 - 1 Key Vault pour les clés SSH des VMs
 - 1 paire de clés SSH ED25519 générée si elle n'existe pas déjà
 - 1 Azure Container Registry (ACR) Standard avec authentification obligatoire (dans le RG DevOps)
-=======
 - 1 VNet Hub (10.0.0.0/16) avec 1 Subnet APIM (10.0.0.0/24)
 - 1 Azure API Management (Developer, External) dans le RG DevOps
->>>>>>> 187da20 (docs: update README with APIM documentation)
 
 **Utilisation :**
 ```hcl
