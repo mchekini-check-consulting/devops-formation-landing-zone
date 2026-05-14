@@ -36,6 +36,12 @@ variable "acr_id" {
   type        = string
 }
 
+variable "apim_subnet_cidr" {
+  description = "CIDR du subnet APIM dans le hub"
+  type        = string
+  default     = "10.0.0.0/24"
+}
+
 variable "tags" {
   type = map(string)
   default = {}
