@@ -77,8 +77,8 @@ resource "azurerm_linux_virtual_machine" "keycloak" {
   name                = "vm-${var.team_name}-keycloak-hub"
   resource_group_name = azurerm_resource_group.network.name
   location            = azurerm_resource_group.network.location
-  size                = var.vm_size
-  admin_username      = var.vm_admin_username
+  size                = var.keycloak_vm_size
+  admin_username      = var.keycloak_vm_admin_username
 
   disable_password_authentication = true
   network_interface_ids           = [azurerm_network_interface.keycloak.id]
@@ -86,7 +86,7 @@ resource "azurerm_linux_virtual_machine" "keycloak" {
 
   # Clé SSH
   admin_ssh_key {
-    username   = var.vm_admin_username
+    username   = var.keycloak_vm_admin_username
     public_key = data.azurerm_key_vault_secret.admin_ssh_public_key.value
   }
 

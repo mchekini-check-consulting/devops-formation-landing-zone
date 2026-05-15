@@ -9,6 +9,8 @@ module "hub" {
   ssh_private_key_secret_name = var.ssh_private_key_secret_name
   readers_group_object_id = var.readers_group_object_id
   apim_publisher_email = var.apim_publisher_email
+  keycloak_vm_admin_username = var.keycloak_vm_admin_username
+  keycloak_vm_size = var.keycloak_vm_size
 }
 
 

@@ -91,3 +91,16 @@ variable "apim_publisher_email" {
   type        = string
   default     = "devops@formation.com"
 }
+
+
+variable "keycloak_vm_size" {
+  description = "Gabarit de la VM keycloak"
+  type        = string
+  default     = "Standard_B2s"
+}
+
+variable "keycloak_vm_admin_username" {
+  description = "Utilisateur administrateur des VMs linux"
+  type        = string
+  default     = "azureuser"
+}
