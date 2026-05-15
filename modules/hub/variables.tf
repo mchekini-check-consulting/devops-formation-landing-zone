@@ -32,16 +32,14 @@ variable "readers_group_object_id" {
   type = string
 }
 
-variable "vm_size" {
+variable "keycloak_vm_size" {
   description = "Gabarit de la VM keycloak"
   type        = string
-  default     = "Standard_B2ts_v2"
 }
 
-variable "vm_admin_username" {
+variable "keycloak_vm_admin_username" {
   description = "Utilisateur administrateur des VMs linux"
   type        = string
-  default     = "azureuser"
 }
 
 variable "apim_publisher_email" {

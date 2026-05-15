@@ -14,3 +14,6 @@ vm_count = {
 }
 
 vm_environments = ["dev"]
+
+keycloak_vm_admin_username = "azureuser"
+keycloak_vm_size = "Standard_B2s"
