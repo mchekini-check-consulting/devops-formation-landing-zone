@@ -277,6 +277,7 @@ az vm list -g rg-formation-ecom-dev -d -o table
 | `vm_count` | Nombre de VMs front/back | `object` | `{ front = 1, back = 1 }` |
 | `vm_environments` | Environnements où créer les VMs | `list(string)` | `["dev"]` |
 | `vm_admin_username` | Utilisateur admin Linux | `string` | `"azureuser"` |
+| `apim_publisher_email` | Email du publisher pour l'APIM | `string` | `"devops@formation.com"` |
 
 ### Plan d'adressage IP par défaut
 
@@ -307,6 +308,8 @@ Crée les ressources partagées :
 - 1 Key Vault pour les clés SSH des VMs
 - 1 paire de clés SSH ED25519 générée si elle n'existe pas déjà
 - 1 Azure Container Registry (ACR) Standard avec authentification obligatoire (dans le RG DevOps)
+- 1 VNet Hub (10.0.0.0/16) avec 1 Subnet APIM (10.0.0.0/24)
+- 1 Azure API Management (Developer, External) dans le RG DevOps
 
 **Utilisation :**
 ```hcl

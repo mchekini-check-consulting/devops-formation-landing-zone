@@ -43,3 +43,8 @@ variable "vm_admin_username" {
   type        = string
   default     = "azureuser"
 }
+
+variable "apim_publisher_email" {
+  description = "Email du publisher pour Azure API Management"
+  type        = string
+}
