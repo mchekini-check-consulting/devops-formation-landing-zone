@@ -87,6 +87,18 @@ resource "azurerm_network_security_group" "apim" {
     destination_address_prefix = "10.1.1.0/24"
   }
 
+  security_rule {
+    name                       = "Allow-Keycloak-Outbound"
+    priority                   = 140
+    direction                  = "Outbound"
+    access                     = "Allow"
+    protocol                   = "Tcp"
+    source_port_range          = "*"
+    destination_port_range     = "8443"
+    source_address_prefix      = "VirtualNetwork"
+    destination_address_prefix = local.keycloak_subnet_prefix
+  }
+
   tags = merge(local.common_tags, { Function = "apim" })
 }
 
@@ -192,34 +204,106 @@ resource "azurerm_api_management_api_operation" "catchall_delete" {
   }
 }
 
+resource "azurerm_api_management_api_operation" "catchall_options" {
+  operation_id        = "catchall-options"
+  api_name            = azurerm_api_management_api.main.name
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.devops.name
+  display_name        = "Catch All OPTIONS"
+  method              = "OPTIONS"
+  url_template        = "/{*path}"
+
+  template_parameter {
+    name     = "path"
+    type     = "string"
+    required = true
+  }
+}
+
+resource "azurerm_api_management_api_operation" "catchall_patch" {
+  operation_id        = "catchall-patch"
+  api_name            = azurerm_api_management_api.main.name
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.devops.name
+  display_name        = "Catch All PATCH"
+  method              = "PATCH"
+  url_template        = "/{*path}"
+
+  template_parameter {
+    name     = "path"
+    type     = "string"
+    required = true
+  }
+}
+
+resource "azurerm_api_management_backend" "keycloak" {
+  name                = "keycloak-backend"
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.devops.name
+  protocol            = "http"
+  url                 = "https://${azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address}:8443"
+
+  tls {
+    validate_certificate_chain = false
+    validate_certificate_name  = false
+  }
+}
+
 resource "azurerm_api_management_api_policy" "routing" {
   api_name            = azurerm_api_management_api.main.name
   api_management_name = azurerm_api_management.main.name
   resource_group_name = azurerm_resource_group.devops.name
 
+  depends_on = [azurerm_api_management_backend.keycloak]
+
   xml_content = <<-XML
 <policies>
   <inbound>
     <base />
-    <cors allow-credentials="false">
-      <allowed-origins>
-        <origin>*</origin>
-      </allowed-origins>
-      <allowed-methods preflight-result-max-age="300">
-        <method>GET</method>
-        <method>POST</method>
-        <method>PUT</method>
-        <method>DELETE</method>
-        <method>OPTIONS</method>
-      </allowed-methods>
-      <allowed-headers>
-        <header>*</header>
-      </allowed-headers>
-      <expose-headers>
-        <header>*</header>
-      </expose-headers>
-    </cors>
+    <!-- Preflight OPTIONS pour les routes API -->
     <choose>
+      <when condition="@(context.Request.Method == &quot;OPTIONS&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/&quot;))">
+        <return-response>
+          <set-status code="200" reason="OK" />
+          <set-header name="Access-Control-Allow-Origin" exists-action="override">
+            <value>http://20.43.59.226</value>
+          </set-header>
+          <set-header name="Access-Control-Allow-Methods" exists-action="override">
+            <value>GET,POST,PUT,DELETE,PATCH,OPTIONS</value>
+          </set-header>
+          <set-header name="Access-Control-Allow-Headers" exists-action="override">
+            <value>Authorization,Content-Type,x-correlation-id,x-user-id</value>
+          </set-header>
+          <set-header name="Access-Control-Allow-Credentials" exists-action="override">
+            <value>true</value>
+          </set-header>
+          <set-header name="Access-Control-Max-Age" exists-action="override">
+            <value>300</value>
+          </set-header>
+        </return-response>
+      </when>
+    </choose>
+    <!-- Validation JWT uniquement pour les routes API -->
+    <choose>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
+        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" require-expiration-time="true" require-signed-tokens="true">
+          <openid-config url="https://${azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address}:8443/realms/user/.well-known/openid-configuration" />
+          <audiences>
+            <audience>account</audience>
+          </audiences>
+        </validate-jwt>
+      </when>
+    </choose>
+    <!-- Routage -->
+    <choose>
+      <when condition="@(context.Request.Url.Path.StartsWith(&quot;auth&quot;))">
+        <set-backend-service backend-id="keycloak-backend" />
+        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(4))" copy-unmatched-params="true" />
+      </when>
+      <when condition="@(context.Request.Url.Path.StartsWith(&quot;keycloak&quot;))">
+        <set-backend-service backend-id="keycloak-backend" />
+        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(9))" copy-unmatched-params="true" />
+      </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/products&quot;))">
         <set-backend-service base-url="http://10.1.1.4:4000" />
       </when>
@@ -235,13 +319,22 @@ resource "azurerm_api_management_api_policy" "routing" {
         </return-response>
       </otherwise>
     </choose>
-    <set-header name="Origin" exists-action="delete" />
   </inbound>
   <backend>
     <forward-request />
   </backend>
   <outbound>
     <base />
+    <choose>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
+        <set-header name="Access-Control-Allow-Origin" exists-action="override">
+          <value>http://20.43.59.226</value>
+        </set-header>
+        <set-header name="Access-Control-Allow-Credentials" exists-action="override">
+          <value>true</value>
+        </set-header>
+      </when>
+    </choose>
   </outbound>
   <on-error>
     <base />
