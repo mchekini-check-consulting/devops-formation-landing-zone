@@ -1,5 +1,6 @@
 locals {
-  terraform_secret_permissions = ["Get", "Set", "List", "Delete", "Recover", "Purge"]
+  terraform_secret_permissions      = ["Get", "Set", "List", "Delete", "Recover", "Purge"]
+  terraform_certificate_permissions = ["Get", "List", "Create", "Delete", "Import", "Update", "Recover", "Purge"]
 }
 
 data "azurerm_client_config" "current" {}
@@ -65,12 +66,76 @@ resource "azurerm_key_vault" "main" {
 
 
   access_policy {
-    tenant_id          = data.azurerm_client_config.current.tenant_id
-    object_id          = var.readers_group_object_id
-    secret_permissions = local.terraform_secret_permissions 
+    tenant_id               = data.azurerm_client_config.current.tenant_id
+    object_id               = var.readers_group_object_id
+    secret_permissions      = local.terraform_secret_permissions
+    certificate_permissions = local.terraform_certificate_permissions
+  }
+
+  # Access policy pour les identités des VMs front (lecture certificats)
+  dynamic "access_policy" {
+    for_each = var.front_vm_identity_principal_ids
+    content {
+      tenant_id               = data.azurerm_client_config.current.tenant_id
+      object_id               = access_policy.value
+      secret_permissions      = ["Get", "List"]
+      certificate_permissions = ["Get", "List"]
+    }
   }
 
   tags = merge(local.common_tags, {
     Function = "security"
+  })
+}
+
+#--------------------------------------------------------------
+# Certificat auto-signé pour HTTPS sur la VM front
+#--------------------------------------------------------------
+resource "azurerm_key_vault_certificate" "front_tls" {
+  name         = "front-tls"
+  key_vault_id = azurerm_key_vault.main.id
+
+  certificate_policy {
+    issuer_parameters {
+      name = "Self"
+    }
+
+    key_properties {
+      exportable = true
+      key_type   = "RSA"
+      key_size   = 2048
+      reuse_key  = true
+    }
+
+    secret_properties {
+      content_type = "application/x-pem-file"
+    }
+
+    x509_certificate_properties {
+      subject            = "CN=ecom-front"
+      validity_in_months = 12
+
+      subject_alternative_names {
+        dns_names = ["ecom-front"]
+      }
+
+      key_usage = [
+        "digitalSignature",
+        "keyEncipherment",
+      ]
+    }
+
+    lifetime_action {
+      action {
+        action_type = "AutoRenew"
+      }
+      trigger {
+        days_before_expiry = 30
+      }
+    }
+  }
+
+  tags = merge(local.common_tags, {
+    Function = "tls"
   })
 }

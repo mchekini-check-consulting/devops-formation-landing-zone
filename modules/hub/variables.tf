@@ -46,3 +46,9 @@ variable "apim_publisher_email" {
   description = "Email du publisher pour Azure API Management"
   type        = string
 }
+
+variable "front_vm_identity_principal_ids" {
+  description = "Principal IDs des identités managées des VMs front (pour accès Key Vault)"
+  type        = list(string)
+  default     = []
+}

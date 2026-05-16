@@ -22,3 +22,21 @@ output "postgres_server_names" {
     for env in var.environments : env => azurerm_postgresql_flexible_server.postgres[env].name
   }
 }
+
+#--------------------------------------------------------------
+# VM Identity Outputs
+#--------------------------------------------------------------
+
+output "keyvault_identity_principal_ids" {
+  description = "Principal IDs des identités Key Vault par environnement (utilisées par les VMs front)"
+  value = {
+    for env in var.environments : env => azurerm_user_assigned_identity.keyvault[env].principal_id
+  }
+}
+
+output "keyvault_identity_client_ids" {
+  description = "Client IDs des identités Key Vault par environnement (pour IMDS)"
+  value = {
+    for env in var.environments : env => azurerm_user_assigned_identity.keyvault[env].client_id
+  }
+}

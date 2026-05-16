@@ -11,6 +11,8 @@ module "hub" {
   apim_publisher_email = var.apim_publisher_email
   keycloak_vm_admin_username = var.keycloak_vm_admin_username
   keycloak_vm_size = var.keycloak_vm_size
+
+  front_vm_identity_principal_ids = values(module.spoke.keyvault_identity_principal_ids)
 }
 
 
