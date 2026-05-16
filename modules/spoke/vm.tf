@@ -132,13 +132,17 @@ resource "azurerm_linux_virtual_machine" "vm" {
   }
 
   identity {
-    type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.acr[each.value.env].id]
+    type = "UserAssigned"
+    identity_ids = each.value.tier == "front" ? [
+      azurerm_user_assigned_identity.acr[each.value.env].id,
+      azurerm_user_assigned_identity.keyvault[each.value.env].id
+    ] : [azurerm_user_assigned_identity.acr[each.value.env].id]
   }
 
   tags = merge(local.common_tags, {
-    Environment = each.value.env
-    Tier        = each.value.tier
+    Environment           = each.value.env
+    Tier                  = each.value.tier
+    kv_identity_client_id = each.value.tier == "front" ? azurerm_user_assigned_identity.keyvault[each.value.env].client_id : ""
   })
 }
 

@@ -266,7 +266,7 @@ resource "azurerm_api_management_api_policy" "routing" {
         <return-response>
           <set-status code="200" reason="OK" />
           <set-header name="Access-Control-Allow-Origin" exists-action="override">
-            <value>http://20.43.59.226</value>
+            <value>https://20.43.59.226</value>
           </set-header>
           <set-header name="Access-Control-Allow-Methods" exists-action="override">
             <value>GET,POST,PUT,DELETE,PATCH,OPTIONS</value>
@@ -287,7 +287,7 @@ resource "azurerm_api_management_api_policy" "routing" {
     <choose>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
         <validate-jwt header-name="Authorization" failed-validation-httpcode="401" require-expiration-time="true" require-signed-tokens="true">
-          <openid-config url="https://${azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address}:8443/realms/user/.well-known/openid-configuration" />
+          <openid-config url="https://ecom-apim-formation.azure-api.net/keycloak/realms/user/.well-known/openid-configuration" />
           <audiences>
             <audience>account</audience>
           </audiences>
@@ -328,7 +328,7 @@ resource "azurerm_api_management_api_policy" "routing" {
     <choose>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
         <set-header name="Access-Control-Allow-Origin" exists-action="override">
-          <value>http://20.43.59.226</value>
+          <value>https://20.43.59.226</value>
         </set-header>
         <set-header name="Access-Control-Allow-Credentials" exists-action="override">
           <value>true</value>
