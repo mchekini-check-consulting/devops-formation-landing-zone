@@ -66,3 +66,40 @@ output "payment_lb_ip" {
     for env, lb in azurerm_lb.payment : env => lb.frontend_ip_configuration[0].private_ip_address
   }
 }
+
+#--------------------------------------------------------------
+# Fraud-check outputs (single Function App created only for "dev")
+#--------------------------------------------------------------
+
+output "fraud_check_function_app_ids" {
+  description = "IDs des Function Apps fraud-check par environnement (valeur pour dev, null sinon)"
+  value = {
+    for env in var.environments :
+    env => env == "dev" ? azurerm_linux_function_app.fraud_check.id : null
+  }
+}
+
+output "fraud_check_function_app_names" {
+  description = "Noms des Function Apps fraud-check par environnement (valeur pour dev, null sinon)"
+  value = {
+    for env in var.environments :
+    env => env == "dev" ? azurerm_linux_function_app.fraud_check.name : null
+  }
+}
+
+output "fraud_check_function_urls" {
+  description = "URLs des endpoints fraud-check par environnement (valeur pour dev, null sinon)"
+  value = {
+    for env in var.environments :
+    env => env == "dev" ? "https://${azurerm_linux_function_app.fraud_check.default_hostname}/api/fraud-check" : null
+  }
+  sensitive = false
+}
+
+output "fraud_check_identity_principal_ids" {
+  description = "Principal IDs des Managed Identities fraud-check par environnement (valeur pour dev, null sinon)"
+  value = {
+    for env in var.environments :
+    env => env == "dev" ? azurerm_user_assigned_identity.fraud_check.principal_id : null
+  }
+}

@@ -1,0 +1,154 @@
+<!--
+  Policy APIM — POST /v1/payments
+  À appliquer sur l'opération POST /v1/payments de l'API "payment" dans Azure API Management.
+
+  Flux :
+    1. Inbound  : extrait l'IP cliente, appelle la Function fraud-check.
+    2. Si deny  : retourne 403 Forbidden, le backend n'est jamais appelé.
+    3. Si allow : laisse passer vers le backend (microservice payment).
+
+  Variables Terraform à substituer avant déploiement (ou via Named Values APIM) :
+    {{fraud-check-url}}     → output.fraud_check_function_urls[env]
+                              ex : https://func-formation-ecom-fraud-check-dev.azurewebsites.net/api/fraud-check
+    {{fraud-check-api-key}} → clé d'API de la Function App (authLevel=function)
+                              Stocker dans un Named Value secret APIM.
+-->
+<policies>
+  <inbound>
+    <base />
+
+    <!--
+      ─────────────────────────────────────────────────────────────────
+      Étape 1 : Construire le payload à envoyer à la Function.
+      On forward le body original + l'IP cliente extraite du header
+      X-Forwarded-For (injectée automatiquement par APIM).
+      ─────────────────────────────────────────────────────────────────
+    -->
+    <set-variable name="clientIp"
+                  value="@(context.Request.IpAddress)" />
+
+    <!--
+      Lecture du body en cache pour pouvoir l'utiliser deux fois
+      (ici dans send-request et ensuite pour le backend).
+    -->
+    <set-variable name="paymentBody"
+                  value="@(context.Request.Body.As<string>(preserveContent: true))" />
+
+    <!--
+      Enrichit le body avec client_ip pour la Function.
+      On parse le JSON original, on ajoute le champ, on re-sérialise.
+    -->
+    <set-variable name="fraudCheckPayload" value="@{
+      var body = Newtonsoft.Json.Linq.JObject.Parse(
+        (string)context.Variables["paymentBody"]
+      );
+      body["client_ip"] = (string)context.Variables["clientIp"];
+      return body.ToString(Newtonsoft.Json.Formatting.None);
+    }" />
+
+    <!--
+      ─────────────────────────────────────────────────────────────────
+      Étape 2 : Appel synchrone à la Function fraud-check.
+      send-request est bloquant : APIM attend la réponse avant de
+      continuer.
+      ─────────────────────────────────────────────────────────────────
+    -->
+    <send-request mode="new"
+                  response-variable-name="fraudCheckResponse"
+                  timeout="5"
+                  ignore-error="false">
+      <set-url>{{fraud-check-url}}</set-url>
+      <set-method>POST</set-method>
+      <set-header name="Content-Type" exists-action="override">
+        <value>application/json</value>
+      </set-header>
+     
+      <set-body>@((string)context.Variables["fraudCheckPayload"])</set-body>
+    </send-request>
+
+    <!--
+      ─────────────────────────────────────────────────────────────────
+      Étape 3 : Lire la décision retournée par la Function.
+      Corps attendu : { "decision": "allow"|"deny", "reason": "..." }
+      ─────────────────────────────────────────────────────────────────
+    -->
+    <set-variable name="fraudDecision" value="@{
+      var response = (IResponse)context.Variables["fraudCheckResponse"];
+      var json = Newtonsoft.Json.Linq.JObject.Parse(
+        response.Body.As<string>()
+      );
+      return json["decision"]?.ToString() ?? "deny";
+    }" />
+
+    <set-variable name="fraudReason" value="@{
+      var response = (IResponse)context.Variables["fraudCheckResponse"];
+      var json = Newtonsoft.Json.Linq.JObject.Parse(
+        response.Body.As<string>()
+      );
+      return json["reason"]?.ToString() ?? "unknown";
+    }" />
+
+    <!--
+      ─────────────────────────────────────────────────────────────────
+      Étape 4 : Bloquer si deny — le backend n'est jamais appelé.
+      ─────────────────────────────────────────────────────────────────
+    -->
+    <choose>
+      <when condition="@((string)context.Variables["fraudDecision"] == "deny")">
+        <return-response>
+          <set-status code="403" reason="Forbidden" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@{
+            return Newtonsoft.Json.JsonConvert.SerializeObject(new {
+              error   = "payment_blocked",
+              message = "Payment rejected by fraud detection.",
+              reason  = (string)context.Variables["fraudReason"]
+            });
+          }</set-body>
+        </return-response>
+      </when>
+    </choose>
+
+    <!--
+      Si allow : on ne fait rien ici, le flux continue naturellement
+      vers le backend (section <backend> standard d'APIM).
+    -->
+  </inbound>
+
+  <backend>
+    <base />
+  </backend>
+
+  <outbound>
+    <base />
+  </outbound>
+
+  <on-error>
+    <!--
+      En cas d'erreur lors de l'appel à la Function (timeout, 5xx…),
+      on adopte une stratégie "fail-closed" : on bloque le paiement
+      plutôt que de laisser passer un appel non vérifié.
+    -->
+    <choose>
+      <when condition="@(context.LastError.Source == "send-request")">
+        <return-response>
+          <set-status code="503" reason="Service Unavailable" />
+          <set-header name="Content-Type" exists-action="override">
+            <value>application/json</value>
+          </set-header>
+          <set-body>@{
+            return Newtonsoft.Json.JsonConvert.SerializeObject(new {
+              error   = "fraud_check_unavailable",
+              message = "Payment temporarily unavailable. Please retry."
+            });
+          }</set-body>
+        </return-response>
+      </when>
+      <otherwise>
+        <base />
+      </otherwise>
+    </choose>
+  </on-error>
+</policies>

@@ -140,6 +140,16 @@ resource "azurerm_api_management_api" "main" {
   subscription_required = false
 }
 
+resource "azurerm_api_management_api_operation" "payments_post" {
+  operation_id        = "payments-post"
+  api_name            = azurerm_api_management_api.main.name
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.devops.name
+  display_name        = "Payments POST"
+  method              = "POST"
+  url_template        = "/api/payments"
+}
+
 resource "azurerm_api_management_api_operation" "catchall" {
   operation_id        = "catchall"
   api_name            = azurerm_api_management_api.main.name
@@ -247,6 +257,24 @@ resource "azurerm_api_management_backend" "keycloak" {
     validate_certificate_chain = false
     validate_certificate_name  = false
   }
+}
+
+resource "azurerm_api_management_api_operation_policy" "payments_post_policy" {
+  api_management_name = azurerm_api_management.main.name
+  resource_group_name = azurerm_resource_group.devops.name
+  api_name            = azurerm_api_management_api.main.name
+  operation_id        = azurerm_api_management_api_operation.payments_post.operation_id
+
+  xml_content = file("${path.module}/fraud-check/apim-policy-payments.xml")
+}
+
+resource "azurerm_api_management_named_value" "fraud_check_url" {
+  name                = "fraud-check-url"
+  display_name        = "fraud_check_url"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = var.fraud_check_function_urls["dev"]
+  secret              = false
 }
 
 resource "azurerm_api_management_api_policy" "routing" {
