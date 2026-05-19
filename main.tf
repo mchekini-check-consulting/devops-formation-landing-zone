@@ -13,6 +13,9 @@ module "hub" {
   keycloak_vm_size = var.keycloak_vm_size
 
   front_vm_identity_principal_ids = values(module.spoke.keyvault_identity_principal_ids)
+
+  backend_vm_ip = module.spoke.backend_vm_ip["dev"]
+  payment_lb_ip = module.spoke.payment_lb_ip["dev"]
 }
 
 

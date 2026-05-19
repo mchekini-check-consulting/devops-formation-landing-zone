@@ -40,3 +40,22 @@ output "keyvault_identity_client_ids" {
     for env in var.environments : env => azurerm_user_assigned_identity.keyvault[env].client_id
   }
 }
+
+#--------------------------------------------------------------
+# Load Balancer Outputs
+#--------------------------------------------------------------
+
+output "backend_vm_ip" {
+  description = "IP privée de la première VM back par environnement"
+  value = {
+    for key, vm in local.vm_instances : vm.env => azurerm_network_interface.vm[key].private_ip_address
+    if vm.service == "back" && vm.index == 1
+  }
+}
+
+output "payment_lb_ip" {
+  description = "IP privée du Load Balancer payment par environnement"
+  value = {
+    for env, lb in azurerm_lb.payment : env => lb.frontend_ip_configuration[0].private_ip_address
+  }
+}

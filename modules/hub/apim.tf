@@ -307,13 +307,13 @@ resource "azurerm_api_management_api_policy" "routing" {
         <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(9))" copy-unmatched-params="true" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/products&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:4000" />
+        <set-backend-service base-url="http://${var.backend_vm_ip}:4000" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/orders&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:8000" />
+        <set-backend-service base-url="http://${var.backend_vm_ip}:8000" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/payments&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:8082" />
+        <set-backend-service base-url="http://${var.payment_lb_ip}:8082" />
       </when>
       <otherwise>
         <return-response>
