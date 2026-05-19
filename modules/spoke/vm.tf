@@ -142,7 +142,8 @@ resource "azurerm_linux_virtual_machine" "vm" {
   tags = merge(local.common_tags, {
     Environment           = each.value.env
     Tier                  = each.value.tier
-    kv_identity_client_id = each.value.tier == "front" ? azurerm_user_assigned_identity.keyvault[each.value.env].client_id : ""
+    kv_identity_client_id  = each.value.tier == "front" ? azurerm_user_assigned_identity.keyvault[each.value.env].client_id : ""
+    acr_identity_client_id = azurerm_user_assigned_identity.acr[each.value.env].client_id
   })
 }
 
