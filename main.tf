@@ -14,7 +14,8 @@ module "hub" {
 
   front_vm_identity_principal_ids = values(module.spoke.keyvault_identity_principal_ids)
 
-  backend_vm_ip = module.spoke.backend_vm_ip["dev"]
+  frontend_public_ip = module.spoke.frontend_public_ip["dev"]
+  backend_vm_ip      = module.spoke.backend_vm_ip["dev"]
   payment_lb_ip = module.spoke.payment_lb_ip["dev"]
 }
 
@@ -35,6 +36,7 @@ module "spoke" {
   ssh_public_key_secret_name = var.ssh_public_key_secret_name
 
   vm_size           = var.vm_size
+  vm_size_back_01   = var.vm_size_back_01
   vm_count          = var.vm_count
   vm_environments   = var.vm_environments
   vm_admin_username = var.vm_admin_username

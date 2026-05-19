@@ -106,7 +106,7 @@ resource "azurerm_linux_virtual_machine" "vm" {
   name                = "vm-${var.team_name}-${var.project_name}-${each.value.service}-${each.value.env}-${format("%02d", each.value.index)}"
   location            = azurerm_resource_group.main[each.value.env].location
   resource_group_name = azurerm_resource_group.main[each.value.env].name
-  size                = var.vm_size
+  size                = each.value.service == "back" && each.value.index == 1 ? var.vm_size_back_01 : var.vm_size
   admin_username      = var.vm_admin_username
 
   disable_password_authentication = true

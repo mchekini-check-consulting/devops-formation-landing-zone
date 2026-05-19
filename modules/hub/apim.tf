@@ -268,7 +268,7 @@ resource "azurerm_api_management_api_policy" "routing" {
         <return-response>
           <set-status code="200" reason="OK" />
           <set-header name="Access-Control-Allow-Origin" exists-action="override">
-            <value>https://20.43.59.226</value>
+            <value>https://${var.frontend_public_ip}</value>
           </set-header>
           <set-header name="Access-Control-Allow-Methods" exists-action="override">
             <value>GET,POST,PUT,DELETE,PATCH,OPTIONS</value>
@@ -294,6 +294,9 @@ resource "azurerm_api_management_api_policy" "routing" {
             <audience>account</audience>
           </audiences>
         </validate-jwt>
+        <set-header name="X-User-ID" exists-action="override">
+          <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt()?.Subject)</value>
+        </set-header>
       </when>
     </choose>
     <!-- Routage -->
@@ -330,7 +333,7 @@ resource "azurerm_api_management_api_policy" "routing" {
     <choose>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
         <set-header name="Access-Control-Allow-Origin" exists-action="override">
-          <value>https://20.43.59.226</value>
+          <value>https://${var.frontend_public_ip}</value>
         </set-header>
         <set-header name="Access-Control-Allow-Credentials" exists-action="override">
           <value>true</value>

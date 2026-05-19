@@ -53,6 +53,13 @@ output "backend_vm_ip" {
   }
 }
 
+output "frontend_public_ip" {
+  description = "IP publique de la VM front par environnement"
+  value = {
+    for key, vm in local.front_vm_instances : vm.env => azurerm_public_ip.front[key].ip_address
+  }
+}
+
 output "payment_lb_ip" {
   description = "IP privée du Load Balancer payment par environnement"
   value = {
