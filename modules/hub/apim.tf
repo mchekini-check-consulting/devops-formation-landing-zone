@@ -261,7 +261,7 @@ resource "azurerm_api_management_api_policy" "routing" {
   <inbound>
     <base />
     <!-- Rate limiting : 200 appels par minute par IP -->
-    <rate-limit-by-key counter-key="@(context.Request.IpAddress)" calls="200" renewal-period="60" />
+    <rate-limit-by-key calls="200" renewal-period="60" counter-key="fixed-key" />
     <!-- Preflight OPTIONS pour les routes API -->
     <choose>
       <when condition="@(context.Request.Method == &quot;OPTIONS&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/&quot;))">
