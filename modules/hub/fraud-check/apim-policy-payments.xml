@@ -132,7 +132,7 @@
       plutôt que de laisser passer un appel non vérifié.
     -->
     <choose>
-      <when condition="@(context.LastError.Source == "send-request")">
+      <when condition="@(context.LastError.Source == &quot;send-request&quot;)">
         <return-response>
           <set-status code="503" reason="Service Unavailable" />
           <set-header name="Content-Type" exists-action="override">
