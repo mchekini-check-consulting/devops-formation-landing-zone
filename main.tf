@@ -45,6 +45,7 @@ module "spoke" {
 
   acr_id = module.hub.acr_id
 
-  apim_subnet_id = module.hub.apim_subnet_id
+  apim_subnet_id  = module.hub.apim_subnet_id
+  apim_public_ip  = module.hub.apim_public_ip
 }
 

@@ -219,3 +219,8 @@ variable "apim_subnet_id" {
   description = "ID du subnet APIM du Hub."
   type        = string
 }
+
+variable "apim_public_ip" {
+  description = "IP publique de l'APIM (pour les restrictions d'accès Function App)."
+  type        = string
+}
