@@ -324,6 +324,32 @@ resource "azurerm_api_management_api_policy" "routing" {
         </return-response>
       </otherwise>
     </choose>
+    <!-- Cache catalog : GET /api/products uniquement -->
+    <choose>
+      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
+        <cache-lookup-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" variable-name="cachedBody" />
+        <choose>
+          <when condition="@(context.Variables.ContainsKey(&quot;cachedBody&quot;))">
+            <return-response>
+              <set-status code="200" reason="OK" />
+              <set-header name="Content-Type" exists-action="override">
+                <value>application/json; charset=utf-8</value>
+              </set-header>
+              <set-header name="X-Cache" exists-action="override">
+                <value>HIT</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Origin" exists-action="override">
+                <value>https://${var.frontend_public_ip}</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Credentials" exists-action="override">
+                <value>true</value>
+              </set-header>
+              <set-body>@((string)context.Variables["cachedBody"])</set-body>
+            </return-response>
+          </when>
+        </choose>
+      </when>
+    </choose>
   </inbound>
   <backend>
     <forward-request />
@@ -337,6 +363,18 @@ resource "azurerm_api_management_api_policy" "routing" {
         </set-header>
         <set-header name="Access-Control-Allow-Credentials" exists-action="override">
           <value>true</value>
+        </set-header>
+      </when>
+    </choose>
+    <!-- Cache store + header X-Cache pour catalog -->
+    <choose>
+      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
+        <cache-store-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" duration="@{
+          var path = context.Request.Url.Path.TrimEnd('/');
+          return path.EndsWith(&quot;products&quot;) ? 60 : 120;
+        }" />
+        <set-header name="X-Cache" exists-action="override">
+          <value>MISS</value>
         </set-header>
       </when>
     </choose>
