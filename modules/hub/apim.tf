@@ -269,12 +269,13 @@ resource "azurerm_api_management_api_operation_policy" "payments_post_policy" {
 
   depends_on = [
     azurerm_api_management_named_value.fraud_check_url,
+    azurerm_api_management_api_policy.routing,
   ]
 }
 
 resource "azurerm_api_management_named_value" "fraud_check_url" {
   name                = "fraud-check-url"
-  display_name        = "fraud_check_url"
+  display_name        = "fraud-check-url"
   resource_group_name = azurerm_resource_group.devops.name
   api_management_name = azurerm_api_management.main.name
   value               = var.fraud_check_function_urls["dev"]

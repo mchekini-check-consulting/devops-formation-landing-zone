@@ -32,7 +32,7 @@
       (ici dans send-request et ensuite pour le backend).
     -->
     <set-variable name="paymentBody"
-                  value="@(context.Request.Body.As<string>(preserveContent: true))" />
+                  value="@(context.Request.Body.As&lt;string&gt;(preserveContent: true))" />
 
     <!--
       Enrichit le body avec client_ip pour la Function.
@@ -40,9 +40,9 @@
     -->
     <set-variable name="fraudCheckPayload" value="@{
       var body = Newtonsoft.Json.Linq.JObject.Parse(
-        (string)context.Variables["paymentBody"]
+        (string)context.Variables[&quot;paymentBody&quot;]
       );
-      body["client_ip"] = (string)context.Variables["clientIp"];
+      body[&quot;client_ip&quot;] = (string)context.Variables[&quot;clientIp&quot;];
       return body.ToString(Newtonsoft.Json.Formatting.None);
     }" />
 
@@ -73,19 +73,19 @@
       ─────────────────────────────────────────────────────────────────
     -->
     <set-variable name="fraudDecision" value="@{
-      var response = (IResponse)context.Variables["fraudCheckResponse"];
+      var response = (IResponse)context.Variables[&quot;fraudCheckResponse&quot;];
       var json = Newtonsoft.Json.Linq.JObject.Parse(
-        response.Body.As<string>()
+        response.Body.As&lt;string&gt;()
       );
-      return json["decision"]?.ToString() ?? "deny";
+      return json[&quot;decision&quot;]?.ToString() ?? &quot;deny&quot;;
     }" />
 
     <set-variable name="fraudReason" value="@{
-      var response = (IResponse)context.Variables["fraudCheckResponse"];
+      var response = (IResponse)context.Variables[&quot;fraudCheckResponse&quot;];
       var json = Newtonsoft.Json.Linq.JObject.Parse(
-        response.Body.As<string>()
+        response.Body.As&lt;string&gt;()
       );
-      return json["reason"]?.ToString() ?? "unknown";
+      return json[&quot;reason&quot;]?.ToString() ?? &quot;unknown&quot;;
     }" />
 
     <!--
@@ -94,7 +94,7 @@
       ─────────────────────────────────────────────────────────────────
     -->
     <choose>
-      <when condition="@((string)context.Variables["fraudDecision"] == "deny")">
+      <when condition="@((string)context.Variables[&quot;fraudDecision&quot;] == &quot;deny&quot;)">
         <return-response>
           <set-status code="403" reason="Forbidden" />
           <set-header name="Content-Type" exists-action="override">
@@ -126,6 +126,7 @@
   </outbound>
 
   <on-error>
+    <base />
     <!--
       En cas d'erreur lors de l'appel à la Function (timeout, 5xx…),
       on adopte une stratégie "fail-closed" : on bloque le paiement
@@ -146,9 +147,6 @@
           }</set-body>
         </return-response>
       </when>
-      <otherwise>
-        <base />
-      </otherwise>
     </choose>
   </on-error>
 </policies>
