@@ -266,6 +266,10 @@ resource "azurerm_api_management_api_operation_policy" "payments_post_policy" {
   operation_id        = azurerm_api_management_api_operation.payments_post.operation_id
 
   xml_content = file("${path.module}/fraud-check/apim-policy-payments.xml")
+
+  depends_on = [
+    azurerm_api_management_named_value.fraud_check_url,
+  ]
 }
 
 resource "azurerm_api_management_named_value" "fraud_check_url" {
