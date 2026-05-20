@@ -52,3 +52,18 @@ variable "front_vm_identity_principal_ids" {
   type        = list(string)
   default     = []
 }
+
+variable "frontend_public_ip" {
+  description = "IP publique de la VM front (pour CORS APIM)"
+  type        = string
+}
+
+variable "backend_vm_ip" {
+  description = "IP privée de la VM back (depuis le spoke)"
+  type        = string
+}
+
+variable "payment_lb_ip" {
+  description = "IP privée du Load Balancer payment (depuis le spoke)"
+  type        = string
+}

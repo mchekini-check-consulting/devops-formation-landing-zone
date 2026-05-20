@@ -63,6 +63,12 @@ variable "vm_size" {
   default     = "Standard_B2ts_v2"
 }
 
+variable "vm_size_back_01" {
+  description = "Gabarit de la VM back-01 (surcharge vm_size)"
+  type        = string
+  default     = "Standard_B2ls_v2"
+}
+
 variable "vm_count" {
   description = "Nombre de VMs par service"
   type = object({

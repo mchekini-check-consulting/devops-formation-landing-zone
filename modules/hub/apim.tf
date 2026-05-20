@@ -261,14 +261,14 @@ resource "azurerm_api_management_api_policy" "routing" {
   <inbound>
     <base />
     <!-- Rate limiting : 200 appels par minute par IP -->
-    <rate-limit-by-key counter-key="@(context.Request.IpAddress)" calls="200" renewal-period="60" />
+    <rate-limit-by-key calls="200" renewal-period="60" counter-key="fixed-key" />
     <!-- Preflight OPTIONS pour les routes API -->
     <choose>
       <when condition="@(context.Request.Method == &quot;OPTIONS&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/&quot;))">
         <return-response>
           <set-status code="200" reason="OK" />
           <set-header name="Access-Control-Allow-Origin" exists-action="override">
-            <value>https://20.43.59.226</value>
+            <value>https://${var.frontend_public_ip}</value>
           </set-header>
           <set-header name="Access-Control-Allow-Methods" exists-action="override">
             <value>GET,POST,PUT,DELETE,PATCH,OPTIONS</value>
@@ -294,6 +294,9 @@ resource "azurerm_api_management_api_policy" "routing" {
             <audience>account</audience>
           </audiences>
         </validate-jwt>
+        <set-header name="X-User-ID" exists-action="override">
+          <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt()?.Subject)</value>
+        </set-header>
       </when>
     </choose>
     <!-- Routage -->
@@ -307,19 +310,45 @@ resource "azurerm_api_management_api_policy" "routing" {
         <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(9))" copy-unmatched-params="true" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/products&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:4000" />
+        <set-backend-service base-url="http://${var.backend_vm_ip}:4000" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/orders&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:8000" />
+        <set-backend-service base-url="http://${var.backend_vm_ip}:8000" />
       </when>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/payments&quot;))">
-        <set-backend-service base-url="http://10.1.1.4:8082" />
+        <set-backend-service base-url="http://${var.payment_lb_ip}:8082" />
       </when>
       <otherwise>
         <return-response>
           <set-status code="404" reason="Not Found" />
         </return-response>
       </otherwise>
+    </choose>
+    <!-- Cache catalog : GET /api/products uniquement -->
+    <choose>
+      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
+        <cache-lookup-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" variable-name="cachedBody" />
+        <choose>
+          <when condition="@(context.Variables.ContainsKey(&quot;cachedBody&quot;))">
+            <return-response>
+              <set-status code="200" reason="OK" />
+              <set-header name="Content-Type" exists-action="override">
+                <value>application/json; charset=utf-8</value>
+              </set-header>
+              <set-header name="X-Cache" exists-action="override">
+                <value>HIT</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Origin" exists-action="override">
+                <value>https://${var.frontend_public_ip}</value>
+              </set-header>
+              <set-header name="Access-Control-Allow-Credentials" exists-action="override">
+                <value>true</value>
+              </set-header>
+              <set-body>@((string)context.Variables["cachedBody"])</set-body>
+            </return-response>
+          </when>
+        </choose>
+      </when>
     </choose>
   </inbound>
   <backend>
@@ -330,10 +359,22 @@ resource "azurerm_api_management_api_policy" "routing" {
     <choose>
       <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
         <set-header name="Access-Control-Allow-Origin" exists-action="override">
-          <value>https://20.43.59.226</value>
+          <value>https://${var.frontend_public_ip}</value>
         </set-header>
         <set-header name="Access-Control-Allow-Credentials" exists-action="override">
           <value>true</value>
+        </set-header>
+      </when>
+    </choose>
+    <!-- Cache store + header X-Cache pour catalog -->
+    <choose>
+      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
+        <cache-store-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" duration="@{
+          var path = context.Request.Url.Path.TrimEnd('/');
+          return path.EndsWith(&quot;products&quot;) ? 60 : 120;
+        }" />
+        <set-header name="X-Cache" exists-action="override">
+          <value>MISS</value>
         </set-header>
       </when>
     </choose>

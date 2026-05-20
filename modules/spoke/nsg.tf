@@ -136,6 +136,22 @@ resource "azurerm_network_security_rule" "back_catalog_from_apim" {
   network_security_group_name = azurerm_network_security_group.back[each.key].name
 }
 
+resource "azurerm_network_security_rule" "back_lb_health_probe" {
+  for_each = toset(var.environments)
+
+  name                        = "Allow-LB-HealthProbe"
+  priority                    = 106
+  direction                   = "Inbound"
+  access                      = "Allow"
+  protocol                    = "Tcp"
+  source_port_range           = "*"
+  destination_port_range      = "8082"
+  source_address_prefix       = "AzureLoadBalancer"
+  destination_address_prefix  = "*"
+  resource_group_name         = azurerm_resource_group.main[each.key].name
+  network_security_group_name = azurerm_network_security_group.back[each.key].name
+}
+
 resource "azurerm_network_security_rule" "back_ssh" {
   for_each = toset([for env in var.environments : env if env != "prod"])
 

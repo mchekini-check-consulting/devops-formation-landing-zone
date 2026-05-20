@@ -10,7 +10,7 @@ vm_size = "Standard_B2ts_v2"
 
 vm_count = {
   front = 1
-  back  = 1
+  back  = 2
 }
 
 vm_environments = ["dev"]
