@@ -88,22 +88,21 @@ resource "azurerm_linux_function_app" "fraud_check" {
       allowed_origins = var.apim_allowed_origins
     }
 
-    # TODO: rétablir les restrictions IP une fois le fraud-check validé
-    # ip_restriction {
-    #   virtual_network_subnet_id = var.apim_subnet_id
-    #   name                      = "Allow-APIM-subnet"
-    #   priority                  = 100
-    #   action                    = "Allow"
-    # }
-    #
-    # ip_restriction {
-    #   ip_address = "${var.apim_public_ip}/32"
-    #   name       = "Allow-APIM-public-ip"
-    #   priority   = 110
-    #   action     = "Allow"
-    # }
-    #
-    # ip_restriction_default_action = "Deny"
+    ip_restriction {
+      virtual_network_subnet_id = var.apim_subnet_id
+      name                      = "Allow-APIM-subnet"
+      priority                  = 100
+      action                    = "Allow"
+    }
+    
+    ip_restriction {
+      ip_address = "${var.apim_public_ip}/32"
+      name       = "Allow-APIM-public-ip"
+      priority   = 110
+      action     = "Allow"
+    }
+    
+    ip_restriction_default_action = "Deny"
   }
 
   app_settings = {
