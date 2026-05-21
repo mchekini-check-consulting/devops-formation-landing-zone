@@ -2,12 +2,14 @@
 # Storage Account (nécessaire pour Azure Functions Consumption plan)
 # Le nom doit être globalement unique, ≤ 24 cars, lowercase alphanum.
 # On tronque team + project à 8 chars chacun pour rester dans la limite.
+# st(2) + team(8) + project(8) + env(max 4) = 22 chars max ✅
 # ---------------------------------------------------------------------------
 resource "azurerm_storage_account" "fraud_check" {
-  # st + 8 chars team + 8 chars project + env (dev) = 22 chars max ✅
-  name = "st${substr(replace(var.team_name, "-", ""), 0, 8)}${substr(replace(var.project_name, "-", ""), 0, 8)}dev"
+  for_each = toset(var.environments)
 
-  resource_group_name      = azurerm_resource_group.main["dev"].name
+  name = "st${substr(replace(var.team_name, "-", ""), 0, 8)}${substr(replace(var.project_name, "-", ""), 0, 8)}${each.key}"
+
+  resource_group_name      = azurerm_resource_group.main[each.key].name
   location                 = var.location
   account_tier             = "Standard"
   account_replication_type = "LRS"
@@ -16,7 +18,7 @@ resource "azurerm_storage_account" "fraud_check" {
   min_tls_version                 = "TLS1_2"
 
   tags = merge(local.common_tags, {
-    Environment = "dev"
+    Environment = each.key
     Component   = "fraud-check"
   })
 }
@@ -26,14 +28,16 @@ resource "azurerm_storage_account" "fraud_check" {
 # SKU Y1 = Consumption plan Linux
 # ---------------------------------------------------------------------------
 resource "azurerm_service_plan" "fraud_check" {
-  name                = "asp-${var.team_name}-${var.project_name}-fraud-check-dev"
-  resource_group_name = azurerm_resource_group.main["dev"].name
+  for_each = toset(var.environments)
+
+  name                = "asp-${var.team_name}-${var.project_name}-fraud-check-${each.key}"
+  resource_group_name = azurerm_resource_group.main[each.key].name
   location            = var.location
   os_type             = "Linux"
   sku_name            = "Y1"
 
   tags = merge(local.common_tags, {
-    Environment = "dev"
+    Environment = each.key
     Component   = "fraud-check"
   })
 }
@@ -42,21 +46,25 @@ resource "azurerm_service_plan" "fraud_check" {
 # Managed Identity dédiée à la Function App (principe du moindre privilège)
 # ---------------------------------------------------------------------------
 resource "azurerm_user_assigned_identity" "fraud_check" {
-  name                = "id-${var.team_name}-${var.project_name}-fraud-check-dev"
-  resource_group_name = azurerm_resource_group.main["dev"].name
+  for_each = toset(var.environments)
+
+  name                = "id-${var.team_name}-${var.project_name}-fraud-check-${each.key}"
+  resource_group_name = azurerm_resource_group.main[each.key].name
   location            = var.location
 
   tags = merge(local.common_tags, {
-    Environment = "dev"
+    Environment = each.key
     Component   = "fraud-check"
   })
 }
 
 # La Function App a besoin de lire/écrire dans son Storage Account
 resource "azurerm_role_assignment" "fraud_check_storage" {
-  scope                = azurerm_storage_account.fraud_check.id
+  for_each = toset(var.environments)
+
+  scope                = azurerm_storage_account.fraud_check[each.key].id
   role_definition_name = "Storage Blob Data Contributor"
-  principal_id         = azurerm_user_assigned_identity.fraud_check.principal_id
+  principal_id         = azurerm_user_assigned_identity.fraud_check[each.key].principal_id
 }
 
 # ---------------------------------------------------------------------------
@@ -65,18 +73,19 @@ resource "azurerm_role_assignment" "fraud_check_storage" {
 #   cd <repo-python> && func azure functionapp publish <name>
 # ---------------------------------------------------------------------------
 resource "azurerm_linux_function_app" "fraud_check" {
+  for_each = toset(var.environments)
 
-  name                = "func-${var.team_name}-${var.project_name}-fraud-check-dev"
-  resource_group_name = azurerm_resource_group.main["dev"].name
+  name                = "func-${var.team_name}-${var.project_name}-fraud-check-${each.key}"
+  resource_group_name = azurerm_resource_group.main[each.key].name
   location            = var.location
 
-  service_plan_id            = azurerm_service_plan.fraud_check.id
-  storage_account_name       = azurerm_storage_account.fraud_check.name
-  storage_account_access_key = azurerm_storage_account.fraud_check.primary_access_key
+  service_plan_id            = azurerm_service_plan.fraud_check[each.key].id
+  storage_account_name       = azurerm_storage_account.fraud_check[each.key].name
+  storage_account_access_key = azurerm_storage_account.fraud_check[each.key].primary_access_key
 
   identity {
     type         = "UserAssigned"
-    identity_ids = [azurerm_user_assigned_identity.fraud_check.id]
+    identity_ids = [azurerm_user_assigned_identity.fraud_check[each.key].id]
   }
 
   site_config {
@@ -94,14 +103,14 @@ resource "azurerm_linux_function_app" "fraud_check" {
       priority                  = 100
       action                    = "Allow"
     }
-    
+
     ip_restriction {
       ip_address = "${var.apim_public_ip}/32"
       name       = "Allow-APIM-public-ip"
       priority   = 110
       action     = "Allow"
     }
-    
+
     ip_restriction_default_action = "Deny"
   }
 
@@ -120,13 +129,13 @@ resource "azurerm_linux_function_app" "fraud_check" {
     BLACKLISTED_IPS         = join(",", var.fraud_blacklisted_ips)
 
     # --- Environnement (utile pour les logs / traces) ---
-    ENVIRONMENT = "dev"
+    ENVIRONMENT = each.key
   }
 
   https_only = true
 
   tags = merge(local.common_tags, {
-    Environment = "dev"
+    Environment = each.key
     Component   = "fraud-check"
   })
 
