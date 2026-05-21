@@ -67,3 +67,9 @@ variable "payment_lb_ip" {
   description = "IP privée du Load Balancer payment (depuis le spoke)"
   type        = string
 }
+
+variable "fraud_check_function_urls" {
+  description = "value"
+  type = map(string)
+  default = {}
+}

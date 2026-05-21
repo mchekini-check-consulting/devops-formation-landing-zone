@@ -70,3 +70,8 @@ output "application_insights_connection_string" {
   value       = azurerm_application_insights.main.connection_string
   sensitive   = true
 }
+
+output "apim_subnet_id" {
+  description = "L'id du subnet APIM"
+  value = azurerm_subnet.subnet-apim.id
+}

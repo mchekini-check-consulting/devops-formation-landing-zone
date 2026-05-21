@@ -17,6 +17,8 @@ module "hub" {
   frontend_public_ip = module.spoke.frontend_public_ip["dev"]
   backend_vm_ip      = module.spoke.backend_vm_ip["dev"]
   payment_lb_ip = module.spoke.payment_lb_ip["dev"]
+  fraud_check_function_urls = module.spoke.fraud_check_function_urls
+
 }
 
 
@@ -42,5 +44,8 @@ module "spoke" {
   vm_admin_username = var.vm_admin_username
 
   acr_id = module.hub.acr_id
+
+  apim_subnet_id  = module.hub.apim_subnet_id
+  apim_public_ip  = module.hub.apim_public_ip
 }
 
