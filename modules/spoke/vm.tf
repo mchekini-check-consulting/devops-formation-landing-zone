@@ -151,7 +151,10 @@ resource "azurerm_linux_virtual_machine" "vm" {
 # Extension AAD SSH Login
 #--------------------------------------------------------------
 resource "azurerm_virtual_machine_extension" "aad_ssh_login" {
-  for_each = local.vm_instances
+  for_each = {
+    for key, vm in local.vm_instances : key => vm
+    if vm.service == "front"
+  }
 
   name                 = "AADSSHLoginForLinux"
   virtual_machine_id   = azurerm_linux_virtual_machine.vm[each.key].id

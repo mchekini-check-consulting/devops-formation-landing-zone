@@ -282,19 +282,50 @@ resource "azurerm_api_management_named_value" "fraud_check_url" {
   secret              = false
 }
 
+resource "azurerm_api_management_named_value" "catalog_rate_limit" {
+  name                = "catalog-rate-limit"
+  display_name        = "catalog-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.catalog_rate_limit)
+  secret              = false
+}
+
+resource "azurerm_api_management_named_value" "order_rate_limit" {
+  name                = "order-rate-limit"
+  display_name        = "order-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.order_rate_limit)
+  secret              = false
+}
+
+resource "azurerm_api_management_named_value" "payment_rate_limit" {
+  name                = "payment-rate-limit"
+  display_name        = "payment-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.payment_rate_limit)
+  secret              = false
+}
+
 resource "azurerm_api_management_api_policy" "routing" {
   api_name            = azurerm_api_management_api.main.name
   api_management_name = azurerm_api_management.main.name
   resource_group_name = azurerm_resource_group.devops.name
 
-  depends_on = [azurerm_api_management_backend.keycloak]
+  depends_on = [
+    azurerm_api_management_backend.keycloak,
+    azurerm_api_management_named_value.catalog_rate_limit,
+    azurerm_api_management_named_value.order_rate_limit,
+    azurerm_api_management_named_value.payment_rate_limit,
+  ]
 
   xml_content = <<-XML
 <policies>
   <inbound>
     <base />
-    <!-- Rate limiting : 200 appels par minute par IP -->
-    <rate-limit-by-key calls="200" renewal-period="60" counter-key="fixed-key" />
+    <!-- Rate limiting différencié par microservice -->
     <!-- Preflight OPTIONS pour les routes API -->
     <choose>
       <when condition="@(context.Request.Method == &quot;OPTIONS&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/&quot;))">
@@ -330,6 +361,18 @@ resource "azurerm_api_management_api_policy" "routing" {
         <set-header name="X-User-ID" exists-action="override">
           <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt()?.Subject)</value>
         </set-header>
+      </when>
+    </choose>
+    <!-- Rate limiting par microservice (après extraction JWT) -->
+    <choose>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/products&quot;))">
+        <rate-limit-by-key calls="{{catalog-rate-limit}}" renewal-period="60" counter-key="@(&quot;catalog-&quot; + context.Request.Headers.GetValueOrDefault(&quot;X-User-ID&quot;, context.Request.IpAddress))" retry-after-header-name="Retry-After" />
+      </when>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/orders&quot;))">
+        <rate-limit-by-key calls="{{order-rate-limit}}" renewal-period="60" counter-key="@(&quot;order-&quot; + context.Request.Headers.GetValueOrDefault(&quot;X-User-ID&quot;, context.Request.IpAddress))" retry-after-header-name="Retry-After" />
+      </when>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/payments&quot;))">
+        <rate-limit-by-key calls="{{payment-rate-limit}}" renewal-period="60" counter-key="@(&quot;payment-&quot; + context.Request.Headers.GetValueOrDefault(&quot;X-User-ID&quot;, context.Request.IpAddress))" retry-after-header-name="Retry-After" />
       </when>
     </choose>
     <!-- Routage -->
@@ -414,6 +457,16 @@ resource "azurerm_api_management_api_policy" "routing" {
   </outbound>
   <on-error>
     <base />
+    <choose>
+      <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
+        <set-header name="Access-Control-Allow-Origin" exists-action="override">
+          <value>https://${var.frontend_public_ip}</value>
+        </set-header>
+        <set-header name="Access-Control-Allow-Credentials" exists-action="override">
+          <value>true</value>
+        </set-header>
+      </when>
+    </choose>
   </on-error>
 </policies>
 XML

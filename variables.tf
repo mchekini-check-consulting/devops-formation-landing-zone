@@ -156,3 +156,36 @@ variable "apim_allowed_origins" {
   type        = list(string)
   default     = ["*"]
 }
+
+variable "catalog_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice catalog."
+  type        = number
+  default     = 300
+
+  validation {
+    condition     = var.catalog_rate_limit >= 1
+    error_message = "catalog_rate_limit doit être >= 1."
+  }
+}
+
+variable "order_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice order."
+  type        = number
+  default     = 60
+
+  validation {
+    condition     = var.order_rate_limit >= 1
+    error_message = "order_rate_limit doit être >= 1."
+  }
+}
+
+variable "payment_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice payment."
+  type        = number
+  default     = 20
+
+  validation {
+    condition     = var.payment_rate_limit >= 1
+    error_message = "payment_rate_limit doit être >= 1."
+  }
+}
