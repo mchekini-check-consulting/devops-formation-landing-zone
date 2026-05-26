@@ -73,3 +73,21 @@ variable "fraud_check_function_urls" {
   type = map(string)
   default = {}
 }
+
+variable "catalog_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice catalog."
+  type        = number
+  default     = 300
+}
+
+variable "order_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice order."
+  type        = number
+  default     = 60
+}
+
+variable "payment_rate_limit" {
+  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice payment."
+  type        = number
+  default     = 20
+}

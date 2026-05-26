@@ -265,7 +265,7 @@ resource "azurerm_api_management_api_operation_policy" "payments_post_policy" {
   api_name            = azurerm_api_management_api.main.name
   operation_id        = azurerm_api_management_api_operation.payments_post.operation_id
 
-  xml_content = file("${path.module}/fraud-check/apim-policy-payments.xml")
+  xml_content = file("${path.module}/policies/apim-policy-payments.xml")
 
   depends_on = [
     azurerm_api_management_named_value.fraud_check_url,
@@ -282,140 +282,49 @@ resource "azurerm_api_management_named_value" "fraud_check_url" {
   secret              = false
 }
 
+resource "azurerm_api_management_named_value" "catalog_rate_limit" {
+  name                = "catalog-rate-limit"
+  display_name        = "catalog-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.catalog_rate_limit)
+  secret              = false
+}
+
+resource "azurerm_api_management_named_value" "order_rate_limit" {
+  name                = "order-rate-limit"
+  display_name        = "order-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.order_rate_limit)
+  secret              = false
+}
+
+resource "azurerm_api_management_named_value" "payment_rate_limit" {
+  name                = "payment-rate-limit"
+  display_name        = "payment-rate-limit"
+  resource_group_name = azurerm_resource_group.devops.name
+  api_management_name = azurerm_api_management.main.name
+  value               = tostring(var.payment_rate_limit)
+  secret              = false
+}
+
 resource "azurerm_api_management_api_policy" "routing" {
   api_name            = azurerm_api_management_api.main.name
   api_management_name = azurerm_api_management.main.name
   resource_group_name = azurerm_resource_group.devops.name
 
-  depends_on = [azurerm_api_management_backend.keycloak]
+  depends_on = [
+    azurerm_api_management_backend.keycloak,
+    azurerm_api_management_named_value.catalog_rate_limit,
+    azurerm_api_management_named_value.order_rate_limit,
+    azurerm_api_management_named_value.payment_rate_limit,
+  ]
 
-  xml_content = <<-XML
-<policies>
-  <inbound>
-    <base />
-    <!-- Rate limiting : 200 appels par minute par IP -->
-    <rate-limit-by-key calls="200" renewal-period="60" counter-key="fixed-key" />
-    <!-- Preflight OPTIONS pour les routes API -->
-    <choose>
-      <when condition="@(context.Request.Method == &quot;OPTIONS&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/&quot;))">
-        <return-response>
-          <set-status code="200" reason="OK" />
-          <set-header name="Access-Control-Allow-Origin" exists-action="override">
-            <value>https://${var.frontend_public_ip}</value>
-          </set-header>
-          <set-header name="Access-Control-Allow-Methods" exists-action="override">
-            <value>GET,POST,PUT,DELETE,PATCH,OPTIONS</value>
-          </set-header>
-          <set-header name="Access-Control-Allow-Headers" exists-action="override">
-            <value>Authorization,Content-Type,x-correlation-id,x-user-id</value>
-          </set-header>
-          <set-header name="Access-Control-Allow-Credentials" exists-action="override">
-            <value>true</value>
-          </set-header>
-          <set-header name="Access-Control-Max-Age" exists-action="override">
-            <value>300</value>
-          </set-header>
-        </return-response>
-      </when>
-    </choose>
-    <!-- Validation JWT uniquement pour les routes API -->
-    <choose>
-      <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
-        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" require-expiration-time="true" require-signed-tokens="true">
-          <openid-config url="https://ecom-apim-formation.azure-api.net/keycloak/realms/user/.well-known/openid-configuration" />
-          <audiences>
-            <audience>account</audience>
-          </audiences>
-        </validate-jwt>
-        <set-header name="X-User-ID" exists-action="override">
-          <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt()?.Subject)</value>
-        </set-header>
-      </when>
-    </choose>
-    <!-- Routage -->
-    <choose>
-      <when condition="@(context.Request.Url.Path.StartsWith(&quot;auth&quot;))">
-        <set-backend-service backend-id="keycloak-backend" />
-        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(4))" copy-unmatched-params="true" />
-      </when>
-      <when condition="@(context.Request.Url.Path.StartsWith(&quot;keycloak&quot;))">
-        <set-backend-service backend-id="keycloak-backend" />
-        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(9))" copy-unmatched-params="true" />
-      </when>
-      <when condition="@(context.Request.Url.Path.Contains(&quot;api/products&quot;))">
-        <set-backend-service base-url="http://${var.backend_vm_ip}:4000" />
-      </when>
-      <when condition="@(context.Request.Url.Path.Contains(&quot;api/orders&quot;))">
-        <set-backend-service base-url="http://${var.backend_vm_ip}:8000" />
-      </when>
-      <when condition="@(context.Request.Url.Path.Contains(&quot;api/payments&quot;))">
-        <set-backend-service base-url="http://${var.payment_lb_ip}:8082" />
-      </when>
-      <otherwise>
-        <return-response>
-          <set-status code="404" reason="Not Found" />
-        </return-response>
-      </otherwise>
-    </choose>
-    <!-- Cache catalog : GET /api/products uniquement -->
-    <choose>
-      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
-        <cache-lookup-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" variable-name="cachedBody" />
-        <choose>
-          <when condition="@(context.Variables.ContainsKey(&quot;cachedBody&quot;))">
-            <return-response>
-              <set-status code="200" reason="OK" />
-              <set-header name="Content-Type" exists-action="override">
-                <value>application/json; charset=utf-8</value>
-              </set-header>
-              <set-header name="X-Cache" exists-action="override">
-                <value>HIT</value>
-              </set-header>
-              <set-header name="Access-Control-Allow-Origin" exists-action="override">
-                <value>https://${var.frontend_public_ip}</value>
-              </set-header>
-              <set-header name="Access-Control-Allow-Credentials" exists-action="override">
-                <value>true</value>
-              </set-header>
-              <set-body>@((string)context.Variables["cachedBody"])</set-body>
-            </return-response>
-          </when>
-        </choose>
-      </when>
-    </choose>
-  </inbound>
-  <backend>
-    <forward-request />
-  </backend>
-  <outbound>
-    <base />
-    <choose>
-      <when condition="@(context.Request.Url.Path.Contains(&quot;api/&quot;))">
-        <set-header name="Access-Control-Allow-Origin" exists-action="override">
-          <value>https://${var.frontend_public_ip}</value>
-        </set-header>
-        <set-header name="Access-Control-Allow-Credentials" exists-action="override">
-          <value>true</value>
-        </set-header>
-      </when>
-    </choose>
-    <!-- Cache store + header X-Cache pour catalog -->
-    <choose>
-      <when condition="@(context.Request.Method == &quot;GET&quot; &amp;&amp; context.Request.Url.Path.Contains(&quot;api/products&quot;))">
-        <cache-store-value key="@(&quot;products-&quot; + context.Request.Url.Path + context.Request.Url.QueryString)" value="@(context.Response.Body.As&lt;string&gt;(preserveContent: true))" duration="@{
-          var path = context.Request.Url.Path.TrimEnd('/');
-          return path.EndsWith(&quot;products&quot;) ? 60 : 120;
-        }" />
-        <set-header name="X-Cache" exists-action="override">
-          <value>MISS</value>
-        </set-header>
-      </when>
-    </choose>
-  </outbound>
-  <on-error>
-    <base />
-  </on-error>
-</policies>
-XML
+  xml_content = templatefile("${path.module}/policies/apim-policy-routing.xml", {
+    frontend_public_ip = var.frontend_public_ip
+    backend_vm_ip      = var.backend_vm_ip
+    payment_lb_ip      = var.payment_lb_ip
+  })
 }
 

@@ -19,6 +19,10 @@ module "hub" {
   payment_lb_ip = module.spoke.payment_lb_ip["dev"]
   fraud_check_function_urls = module.spoke.fraud_check_function_urls
 
+  catalog_rate_limit = var.catalog_rate_limit
+  order_rate_limit   = var.order_rate_limit
+  payment_rate_limit = var.payment_rate_limit
+
 }
 
 
