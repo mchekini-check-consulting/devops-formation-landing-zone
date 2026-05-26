@@ -57,6 +57,53 @@ resource "azurerm_lb_rule" "payment" {
 
 
 #--------------------------------------------------------------
+# NAT Gateway - Accès internet sortant pour les VMs backend
+# (le LB Standard bloque le SNAT par défaut)
+#--------------------------------------------------------------
+resource "azurerm_public_ip" "nat_back" {
+  for_each = toset(var.environments)
+
+  name                = "pip-${var.team_name}-${var.project_name}-nat-back-${each.key}"
+  location            = azurerm_resource_group.main[each.key].location
+  resource_group_name = azurerm_resource_group.main[each.key].name
+  allocation_method   = "Static"
+  sku                 = "Standard"
+
+  tags = merge(local.common_tags, {
+    Environment = each.key
+    Tier        = "backend"
+  })
+}
+
+resource "azurerm_nat_gateway" "back" {
+  for_each = toset(var.environments)
+
+  name                = "nat-${var.team_name}-${var.project_name}-back-${each.key}"
+  location            = azurerm_resource_group.main[each.key].location
+  resource_group_name = azurerm_resource_group.main[each.key].name
+  sku_name            = "Standard"
+
+  tags = merge(local.common_tags, {
+    Environment = each.key
+    Tier        = "backend"
+  })
+}
+
+resource "azurerm_nat_gateway_public_ip_association" "back" {
+  for_each = azurerm_nat_gateway.back
+
+  nat_gateway_id       = each.value.id
+  public_ip_address_id = azurerm_public_ip.nat_back[each.key].id
+}
+
+resource "azurerm_subnet_nat_gateway_association" "back" {
+  for_each = azurerm_nat_gateway.back
+
+  subnet_id      = azurerm_subnet.subnet-back[each.key].id
+  nat_gateway_id = each.value.id
+}
+
+#--------------------------------------------------------------
 # Association des NICs backend au pool du LB
 #--------------------------------------------------------------
 resource "azurerm_network_interface_backend_address_pool_association" "payment" {
