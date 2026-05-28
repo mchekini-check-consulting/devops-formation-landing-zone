@@ -41,13 +41,6 @@ module "platform" {
   oidc_issuer_url = module.aks.oidc_issuer_url
 }
 
-module "platform" {
-  source       = "./modules/platform"
-  team_name    = var.team_name
-  project_name    = "ecom"
-  location        = var.location
-  oidc_issuer_url = module.aks.oidc_issuer_url
-}
 
 module "spoke" {
 
