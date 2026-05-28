@@ -26,6 +26,13 @@ module "hub" {
 }
 
 
+module "aks" {
+  source       = "./modules/aks"
+  team_name    = var.team_name
+  project_name = "ecom"
+  location     = var.location
+}
+
 module "spoke" {
 
   source = "./modules/spoke"

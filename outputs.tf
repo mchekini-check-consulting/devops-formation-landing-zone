@@ -35,3 +35,13 @@ output "postgres_server_names" {
   description = "Noms des serveurs PostgreSQL par environnement"
   value       = module.spoke.postgres_server_names
 }
+
+#--------------------------------------------------------------
+# AKS Outputs
+#--------------------------------------------------------------
+
+output "aks_kubeconfig" {
+  description = "Kubeconfig du cluster AKS"
+  value       = module.aks.kubeconfig
+  sensitive   = true
+}
