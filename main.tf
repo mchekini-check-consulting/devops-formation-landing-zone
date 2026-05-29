@@ -41,6 +41,11 @@ module "platform" {
   oidc_issuer_url = module.aks.oidc_issuer_url
 }
 
+module "platform" {
+  source         = "./modules/platform"
+  kubeconfig_path = "~/.kube/config"
+}
+
 module "spoke" {
 
   source = "./modules/spoke"
