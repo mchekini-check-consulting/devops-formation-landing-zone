@@ -12,11 +12,10 @@ module "hub" {
   keycloak_vm_admin_username = var.keycloak_vm_admin_username
   keycloak_vm_size = var.keycloak_vm_size
 
-  front_vm_identity_principal_ids = values(module.spoke.keyvault_identity_principal_ids)
+  frontend_public_ip = "20.43.59.226"
+  backend_vm_ip      = "10.1.1.4"
+  payment_lb_ip      = "10.1.1.10"
 
-  frontend_public_ip = module.spoke.frontend_public_ip["dev"]
-  backend_vm_ip      = module.spoke.backend_vm_ip["dev"]
-  payment_lb_ip = module.spoke.payment_lb_ip["dev"]
   fraud_check_function_urls = module.spoke.fraud_check_function_urls
 
   catalog_rate_limit = var.catalog_rate_limit
@@ -33,6 +32,11 @@ module "aks" {
   location     = var.location
 }
 
+module "platform" {
+  source         = "./modules/platform"
+  kubeconfig_path = "~/.kube/config"
+}
+
 module "spoke" {
 
   source = "./modules/spoke"
@@ -44,17 +48,6 @@ module "spoke" {
   hub_resource_group_name = module.hub.resource_group_name
   location = var.location
   environments = var.environments
-
-  key_vault_id               = module.hub.key_vault_id
-  ssh_public_key_secret_name = var.ssh_public_key_secret_name
-
-  vm_size           = var.vm_size
-  vm_size_back_01   = var.vm_size_back_01
-  vm_count          = var.vm_count
-  vm_environments   = var.vm_environments
-  vm_admin_username = var.vm_admin_username
-
-  acr_id = module.hub.acr_id
 
   apim_subnet_id  = module.hub.apim_subnet_id
   apim_public_ip  = module.hub.apim_public_ip

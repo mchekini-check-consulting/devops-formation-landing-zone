@@ -29,19 +29,19 @@ variable "aks_subnet_cidr" {
 variable "system_vm_size" {
   description = "Taille des VMs du node pool system"
   type        = string
-  default     = "Standard_D2s_v5"
+  default     = "Standard_B2s_v2"
 }
 
 variable "apps_vm_size" {
   description = "Taille des VMs du node pool apps"
   type        = string
-  default     = "Standard_D4s_v5"
+  default     = "Standard_B2s_v2"
 }
 
 variable "db_vm_size" {
   description = "Taille des VMs du node pool db"
   type        = string
-  default     = "Standard_D4s_v5"
+  default     = "Standard_B2s_v2"
 }
 
 variable "apps_min_count" {
