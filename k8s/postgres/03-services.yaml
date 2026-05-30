@@ -1,0 +1,57 @@
+---
+# Headless Service — résolution DNS par pod
+# postgres-0.postgres.dev.svc.cluster.local
+# postgres-1.postgres.dev.svc.cluster.local
+# postgres-2.postgres.dev.svc.cluster.local
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: dev
+  labels:
+    app: postgres
+spec:
+  clusterIP: None
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+
+---
+# Service Primary — writes uniquement (postgres-0)
+# Le label statefulset.kubernetes.io/pod-name est posé automatiquement par K8s
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-primary
+  namespace: dev
+  labels:
+    app: postgres
+    role: primary
+spec:
+  selector:
+    statefulset.kubernetes.io/pod-name: postgres-0
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
+
+---
+# Service Read — lectures sur tous les pods (primary + replicas)
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-read
+  namespace: dev
+  labels:
+    app: postgres
+    role: read
+spec:
+  selector:
+    app: postgres
+  ports:
+    - name: postgres
+      port: 5432
+      targetPort: 5432
