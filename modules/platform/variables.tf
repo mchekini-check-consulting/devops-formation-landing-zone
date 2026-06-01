@@ -58,7 +58,6 @@ variable "sonarqube_chart_version" {
 variable "kubeconfig_path" {
   description = "Chemin vers le fichier kubeconfig"
   type        = string
-  default     = "~/.kube/config"
 }
 
 variable "velero_storage_account" {
