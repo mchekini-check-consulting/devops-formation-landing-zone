@@ -62,6 +62,11 @@ variable "db_node_count" {
   default     = 2
 }
 
+variable "acr_id" {
+  description = "ID du Azure Container Registry"
+  type        = string
+}
+
 variable "tags" {
   description = "Tags a appliquer aux ressources"
   type        = map(string)
