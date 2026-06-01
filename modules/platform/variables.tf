@@ -43,3 +43,21 @@ variable "velero_uami_client_id" {
   description = "Client ID de l'UAMI Velero (annotation Workload Identity sur le ServiceAccount K8s)"
   type        = string
 }
+
+variable "project_name" {
+  description = "Nom du projet"
+  type        = string
+}
+
+variable "location" {
+  description = "Region Azure"
+  type        = string
+  default     = "francecentral"
+}
+
+variable "oidc_issuer_url" {
+  description = "URL de l'emetteur OIDC du cluster AKS"
+  type        = string
+}
+
+
