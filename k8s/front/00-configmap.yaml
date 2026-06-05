@@ -1,0 +1,12 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: front-config
+  namespace: dev
+  labels:
+    app: front
+data:
+  CATALOG: "http://98.66.248.206/api/products"
+  ORDERS: "http://98.66.248.206/api/orders"
+  PAYMENT: "http://98.66.248.206/api/payments"
+  AUTH_ENABLED: "false"

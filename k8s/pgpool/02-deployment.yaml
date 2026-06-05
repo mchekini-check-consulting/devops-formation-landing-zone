@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: pgpool
+  namespace: dev
+  labels:
+    app: pgpool
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: pgpool
+  template:
+    metadata:
+      labels:
+        app: pgpool
+    spec:
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: pgpool
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels:
+              app: pgpool
+      initContainers:
+        - name: copy-config
+          image: pgpool/pgpool:4.4.3
+          command: ["sh", "-c"]
+          args:
+            - |
+              cp /etc/pgpool-II-custom/pool_hba.conf /opt/pgpool-II/etc/pool_hba.conf
+              cp /etc/pgpool-II-custom/pool_passwd /opt/pgpool-II/etc/pool_passwd
+              chmod 600 /opt/pgpool-II/etc/pool_passwd
+              chmod 600 /opt/pgpool-II/etc/pool_hba.conf
+          volumeMounts:
+            - name: pgpool-config
+              mountPath: /etc/pgpool-II-custom/pool_hba.conf
+              subPath: pool_hba.conf
+            - name: pgpool-secret
+              mountPath: /etc/pgpool-II-custom/pool_passwd
+              subPath: pool_passwd
+            - name: pgpool-etc
+              mountPath: /opt/pgpool-II/etc
+      containers:
+        - name: pgpool
+          image: pgpool/pgpool:4.4.3
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 9999
+          env:
+            # Backend clustering mode
+            - name: PGPOOL_PARAMS_BACKEND_CLUSTERING_MODE
+              value: "streaming_replication"
+            # Backend 0 - Primary
+            - name: PGPOOL_PARAMS_BACKEND_HOSTNAME0
+              value: "postgres-0.postgres.dev.svc.cluster.local"
+            - name: PGPOOL_PARAMS_BACKEND_PORT0
+              value: "5432"
+            - name: PGPOOL_PARAMS_BACKEND_WEIGHT0
+              value: "1"
+            - name: PGPOOL_PARAMS_BACKEND_FLAG0
+              value: "ALWAYS_PRIMARY|DISALLOW_TO_FAILOVER"
+            # Backend 1 - Replica
+            - name: PGPOOL_PARAMS_BACKEND_HOSTNAME1
+              value: "postgres-1.postgres.dev.svc.cluster.local"
+            - name: PGPOOL_PARAMS_BACKEND_PORT1
+              value: "5432"
+            - name: PGPOOL_PARAMS_BACKEND_WEIGHT1
+              value: "1"
+            - name: PGPOOL_PARAMS_BACKEND_FLAG1
+              value: "DISALLOW_TO_FAILOVER"
+            # Backend 2 - Replica
+            - name: PGPOOL_PARAMS_BACKEND_HOSTNAME2
+              value: "postgres-2.postgres.dev.svc.cluster.local"
+            - name: PGPOOL_PARAMS_BACKEND_PORT2
+              value: "5432"
+            - name: PGPOOL_PARAMS_BACKEND_WEIGHT2
+              value: "1"
+            - name: PGPOOL_PARAMS_BACKEND_FLAG2
+              value: "DISALLOW_TO_FAILOVER"
+            # Load balancing
+            - name: PGPOOL_PARAMS_LOAD_BALANCE_MODE
+              value: "on"
+            - name: PGPOOL_PARAMS_STATEMENT_LEVEL_LOAD_BALANCE
+              value: "on"
+            - name: PGPOOL_PARAMS_DISABLE_LOAD_BALANCE_ON_WRITE
+              value: "dml_adaptive"
+            # Streaming replication check
+            - name: PGPOOL_PARAMS_SR_CHECK_PERIOD
+              value: "10"
+            - name: PGPOOL_PARAMS_SR_CHECK_USER
+              value: "formation"
+            - name: PGPOOL_PARAMS_SR_CHECK_DATABASE
+              value: "postgres"
+            - name: PGPOOL_PARAMS_SR_CHECK_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: pgpool-secret
+                  key: sr_check_password
+            # Connection settings
+            - name: PGPOOL_PARAMS_LISTEN_ADDRESSES
+              value: "*"
+            - name: PGPOOL_PARAMS_PORT
+              value: "9999"
+            # Pool settings
+            - name: PGPOOL_PARAMS_NUM_INIT_CHILDREN
+              value: "16"
+            - name: PGPOOL_PARAMS_MAX_POOL
+              value: "2"
+            # Health check disabled (K8s manages via probes)
+            - name: PGPOOL_PARAMS_HEALTH_CHECK_PERIOD
+              value: "0"
+            # Failover disabled (K8s manages failover)
+            - name: PGPOOL_PARAMS_FAILOVER_ON_BACKEND_ERROR
+              value: "off"
+            # HBA
+            - name: PGPOOL_PARAMS_ENABLE_POOL_HBA
+              value: "on"
+          volumeMounts:
+            - name: pgpool-etc
+              mountPath: /opt/pgpool-II/etc
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+          startupProbe:
+            tcpSocket:
+              port: 9999
+            periodSeconds: 10
+            failureThreshold: 6
+          livenessProbe:
+            tcpSocket:
+              port: 9999
+            periodSeconds: 15
+            failureThreshold: 3
+          readinessProbe:
+            tcpSocket:
+              port: 9999
+            periodSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: pgpool-config
+          configMap:
+            name: pgpool-config
+        - name: pgpool-secret
+          secret:
+            secretName: pgpool-secret
+        - name: pgpool-etc
+          emptyDir: {}
