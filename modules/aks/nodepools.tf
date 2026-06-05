@@ -6,6 +6,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   max_count             = var.apps_max_count
   auto_scaling_enabled  = true
   vnet_subnet_id        = azurerm_subnet.aks.id
+  zones                 = ["1", "3"]
   tags                  = var.tags
 }
 
@@ -16,6 +17,7 @@ resource "azurerm_kubernetes_cluster_node_pool" "db" {
   node_count            = var.db_node_count
   auto_scaling_enabled  = false
   vnet_subnet_id        = azurerm_subnet.aks.id
+  zones                 = ["1", "3"]
   tags                  = var.tags
 
   node_taints = ["workload=database:NoSchedule"]
