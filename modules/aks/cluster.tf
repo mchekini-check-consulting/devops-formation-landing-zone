@@ -3,8 +3,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location                = azurerm_resource_group.aks.location
   resource_group_name     = azurerm_resource_group.aks.name
   dns_prefix              = "aks-${var.team_name}-${var.project_name}"
-  private_cluster_enabled = false
-  tags                    = var.tags
+  private_cluster_enabled   = false
+  oidc_issuer_enabled       = true
+  workload_identity_enabled = true
+  tags                      = var.tags
 
   identity {
     type = "SystemAssigned"

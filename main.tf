@@ -32,9 +32,29 @@ module "aks" {
   location     = var.location
 }
 
+module "velero" {
+  source              = "./modules/velero"
+  team_name           = var.team_name
+  location            = var.location
+  resource_group_name = module.aks.resource_group_name
+  aks_oidc_issuer_url = module.aks.oidc_issuer_url
+
+  tags = {
+    managed_by  = "terraform"
+    team        = var.team_name
+    component   = "backup"
+  }
+}
+
 module "platform" {
-  source         = "./modules/platform"
+  source          = "./modules/platform"
   kubeconfig_path = "~/.kube/config"
+
+  velero_storage_account   = module.velero.storage_account_name
+  velero_storage_container = module.velero.storage_container_name
+  velero_resource_group    = module.velero.resource_group_name
+  velero_subscription_id   = module.velero.subscription_id
+  velero_uami_client_id    = module.velero.uami_client_id
 }
 
 module "spoke" {

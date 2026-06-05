@@ -1,0 +1,86 @@
+image:
+  repository: velero/velero
+  tag: v1.15.0
+
+initContainers:
+  - name: velero-plugin-for-azure
+    image: velero/velero-plugin-for-microsoft-azure:v1.11.0
+    imagePullPolicy: IfNotPresent
+    volumeMounts:
+      - mountPath: /target
+        name: plugins
+
+# Workload Identity : le pod porte le label requis par le webhook azure-workload-identity
+podLabels:
+  azure.workload.identity/use: "true"
+
+serviceAccount:
+  server:
+    annotations:
+      azure.workload.identity/client-id: "${uami_client_id}"
+
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: azure
+      bucket: ${storage_container}
+      config:
+        resourceGroup: ${resource_group}
+        storageAccount: ${storage_account}
+        subscriptionId: ${subscription_id}
+        storageAccountKeyEnvVar: ""
+
+  volumeSnapshotLocation:
+    - name: default
+      provider: azure
+      config:
+        resourceGroup: ${resource_group}
+        subscriptionId: ${subscription_id}
+
+# Pas de Secret K8s — authentification via Workload Identity token OIDC
+credentials:
+  useSecret: false
+
+# node-agent (kopia) pour le backup des PersistentVolumes
+nodeAgent:
+  podVolumePath: /var/lib/kubelet/pods
+  privileged: false
+  tolerations:
+    - key: "workload"
+      operator: "Equal"
+      value: "database"
+      effect: "NoSchedule"
+
+schedules:
+  daily-full-cluster:
+    disabled: false
+    schedule: "0 1 * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      ttl: "336h"
+      includedNamespaces:
+        - "*"
+      includeClusterResources: true
+      snapshotVolumes: true
+
+  daily-dev:
+    disabled: false
+    schedule: "30 1 * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      ttl: "168h"
+      includedNamespaces:
+        - "dev"
+      includeClusterResources: false
+      snapshotVolumes: true
+
+  daily-ingress-nginx:
+    disabled: false
+    schedule: "45 1 * * *"
+    useOwnerReferencesInBackup: false
+    template:
+      ttl: "168h"
+      includedNamespaces:
+        - "ingress-nginx"
+      includeClusterResources: false
+      snapshotVolumes: false
