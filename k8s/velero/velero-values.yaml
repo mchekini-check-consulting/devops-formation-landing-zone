@@ -2,6 +2,8 @@ image:
   repository: velero/velero
   tag: v1.15.0
 
+upgradeCRDs: false
+
 initContainers:
   - name: velero-plugin-for-azure
     image: velero/velero-plugin-for-microsoft-azure:v1.11.0
@@ -52,20 +54,20 @@ nodeAgent:
       effect: "NoSchedule"
 
 schedules:
-  daily-full-cluster:
-    disabled: false
-    schedule: "0 1 * * *"
-    useOwnerReferencesInBackup: false
-    template:
-      ttl: "336h"
-      includedNamespaces:
-        - "*"
-      includeClusterResources: true
-      snapshotVolumes: true
+#  daily-full-cluster:
+#    disabled: false
+#    schedule: "0 1 * * *"
+#    useOwnerReferencesInBackup: false
+#    template:
+#      ttl: "336h"
+#      includedNamespaces:
+#        - "*"
+#      includeClusterResources: true
+#      snapshotVolumes: true
 
   daily-dev:
     disabled: false
-    schedule: "30 1 * * *"
+    schedule: "7 18 * * *"
     useOwnerReferencesInBackup: false
     template:
       ttl: "168h"
@@ -74,13 +76,13 @@ schedules:
       includeClusterResources: false
       snapshotVolumes: true
 
-  daily-ingress-nginx:
-    disabled: false
-    schedule: "45 1 * * *"
-    useOwnerReferencesInBackup: false
-    template:
-      ttl: "168h"
-      includedNamespaces:
-        - "ingress-nginx"
-      includeClusterResources: false
-      snapshotVolumes: false
+#  daily-ingress-nginx:
+#    disabled: false
+#    schedule: "45 1 * * *"
+#    useOwnerReferencesInBackup: false
+#    template:
+#      ttl: "168h"
+#      includedNamespaces:
+#        - "ingress-nginx"
+#      includeClusterResources: false
+#      snapshotVolumes: false
