@@ -1,8 +1,25 @@
-variable "kubeconfig_path" {
-  description = "Chemin vers le fichier kubeconfig"
+variable "team_name" {
+  description = "Nom de l'equipe"
   type        = string
-  default     = "~/.kube/config"
 }
+
+variable "project_name" {
+  description = "Nom du projet"
+  type        = string
+}
+
+variable "location" {
+  description = "Region Azure"
+  type        = string
+  default     = "francecentral"
+}
+
+variable "oidc_issuer_url" {
+  description = "URL de l'emetteur OIDC du cluster AKS"
+  type        = string
+}
+
+
 
 variable "velero_storage_account" {
   description = "Nom du Storage Account Azure Blob pour les backups Velero"

@@ -30,6 +30,7 @@ module "aks" {
   team_name    = var.team_name
   project_name = "ecom"
   location     = var.location
+  acr_id       = module.hub.acr_id
 }
 
 module "velero" {
@@ -47,6 +48,11 @@ module "velero" {
 }
 
 module "platform" {
+  source       = "./modules/platform"
+  team_name    = var.team_name
+  project_name    = "ecom"
+  location        = var.location
+  oidc_issuer_url = module.aks.oidc_issuer_url
   source          = "./modules/platform"
   kubeconfig_path = "~/.kube/config"
 

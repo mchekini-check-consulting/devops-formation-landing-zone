@@ -27,3 +27,12 @@ output "aks_kubeconfig" {
   value       = module.aks.kubeconfig
   sensitive   = true
 }
+
+#--------------------------------------------------------------
+# Backup Outputs
+#--------------------------------------------------------------
+
+output "backup_identity_client_id" {
+  description = "Client ID de la Managed Identity backup — à mettre dans k8s/postgres-backup/serviceaccount.yaml"
+  value       = module.platform.backup_identity_client_id
+}

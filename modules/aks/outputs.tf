@@ -5,11 +5,16 @@ output "kubeconfig" {
 }
 
 output "oidc_issuer_url" {
-  description = "URL de l'OIDC Issuer AKS (requis pour les Federated Identity Credentials)"
+  description = "URL de l'émetteur OIDC du cluster AKS"
   value       = azurerm_kubernetes_cluster.aks.oidc_issuer_url
 }
 
+output "cluster_name" {
+  description = "Nom du cluster AKS"
+  value       = azurerm_kubernetes_cluster.aks.name
+}
+
 output "resource_group_name" {
-  description = "Resource Group du cluster AKS"
+  description = "Nom du resource group AKS"
   value       = azurerm_resource_group.aks.name
 }

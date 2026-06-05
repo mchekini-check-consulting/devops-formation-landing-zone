@@ -3,10 +3,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
   location                = azurerm_resource_group.aks.location
   resource_group_name     = azurerm_resource_group.aks.name
   dns_prefix              = "aks-${var.team_name}-${var.project_name}"
-  private_cluster_enabled   = false
+  private_cluster_enabled = false
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
-  tags                      = var.tags
+  tags                    = var.tags
 
   identity {
     type = "SystemAssigned"
@@ -27,4 +27,11 @@ resource "azurerm_kubernetes_cluster" "aks" {
     service_cidr   = "172.16.0.0/16"
     dns_service_ip = "172.16.0.10"
   }
+}
+
+resource "azurerm_role_assignment" "aks_acr_pull" {
+  principal_id                     = azurerm_kubernetes_cluster.aks.kubelet_identity[0].object_id
+  role_definition_name             = "AcrPull"
+  scope                            = var.acr_id
+  skip_service_principal_aad_check = true
 }
