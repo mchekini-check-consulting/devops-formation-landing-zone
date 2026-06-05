@@ -53,7 +53,6 @@ module "platform" {
   project_name    = "ecom"
   location        = var.location
   oidc_issuer_url = module.aks.oidc_issuer_url
-  source          = "./modules/platform"
   kubeconfig_path = "~/.kube/config"
 
   velero_storage_account   = module.velero.storage_account_name
