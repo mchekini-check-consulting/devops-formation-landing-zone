@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: catalogue
+  namespace: dev
+  labels:
+    app: catalogue
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: catalogue
