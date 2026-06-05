@@ -21,6 +21,6 @@ resource "azurerm_federated_identity_credential" "velero" {
   parent_id           = azurerm_user_assigned_identity.velero.id
 
   issuer   = var.aks_oidc_issuer_url
-  subject  = "system:serviceaccount:velero:velero"
+  subject  = "system:serviceaccount:velero:velero-server"
   audience = ["api://AzureADTokenExchange"]
 }
