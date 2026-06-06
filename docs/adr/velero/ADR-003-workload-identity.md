@@ -27,7 +27,7 @@ Utiliser **Azure Workload Identity** avec un **User Assigned Managed Identity (U
 
 ```
 1. AKS OIDC Issuer expose un endpoint JWT (oidc_issuer_url)
-2. Le ServiceAccount K8s "velero" dans le namespace "velero"
+2. Le ServiceAccount K8s "velero-server" dans le namespace "velero"
    porte l'annotation azure.workload.identity/client-id = <UAMI-client-id>
 3. Au démarrage du pod velero-server, le webhook azure-workload-identity
    monte automatiquement un token OIDC projeté dans /var/run/secrets/azure/tokens/
@@ -141,21 +141,59 @@ az aks show -g <rg> -n <aks> --query oidcIssuerProfile
 
 ## Configuration Kubernetes côté Velero
 
-Le ServiceAccount Velero doit porter l'annotation et le label requis par le webhook :
+### ServiceAccount et annotations
 
-```yaml
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: velero
-  namespace: velero
-  annotations:
-    azure.workload.identity/client-id: "<UAMI-client-id>"
-  labels:
-    azure.workload.identity/use: "true"
+Le ServiceAccount Velero doit porter l'annotation et le label requis par le webhook.
+
+> **Important :** Le chart Helm Velero 8.x crée le ServiceAccount sous le nom **`velero-server`** (pas `velero`). Le `subject` du Federated Credential doit correspondre exactement — une erreur `AADSTS700213` indique un `subject` incorrect.
+
+```hcl
+# modules/velero/identity.tf — Federated Credential
+resource "azurerm_federated_identity_credential" "velero" {
+  subject  = "system:serviceaccount:velero:velero-server"  # nom exact du SA créé par le chart 8.x
+  audience = ["api://AzureADTokenExchange"]
+}
 ```
 
-Ces annotations sont injectées via les `values.yaml` du Helm chart dans `modules/platform/velero-values.yaml`.
+```yaml
+# k8s/velero/velero-values.yaml — Helm values
+podLabels:
+  azure.workload.identity/use: "true"
+
+serviceAccount:
+  server:
+    annotations:
+      azure.workload.identity/client-id: "${uami_client_id}"
+```
+
+### Configuration BSL avec `useAAD: "true"`
+
+Pour que le plugin Azure utilise le token Workload Identity au lieu de chercher une clé de Storage Account (`listKeys`), il faut explicitement activer l'AAD dans la config BSL :
+
+```yaml
+configuration:
+  backupStorageLocation:
+    - name: default
+      provider: azure
+      config:
+        storageAccountKeyEnvVar: ""   # désactive la recherche de clé
+        useAAD: "true"                # active l'authentification via token OIDC
+```
+
+Sans `useAAD: "true"`, le plugin tente d'appeler `listKeys` sur le Storage Account — ce qui échoue avec `AuthorizationFailed` car le rôle `Storage Blob Data Contributor` n'accorde pas cette permission (opération de management plane).
+
+### Note sur le VSL et Workload Identity
+
+Le plugin `velero-plugin-for-microsoft-azure` v1.11.0 **ne supporte pas** `useAAD` pour le `VolumeSnapshotLocation` (VSL) :
+
+```yaml
+# INVALIDE en v1.11.0 — ne pas faire :
+volumeSnapshotLocation:
+  config:
+    useAAD: "true"  # → "config has invalid keys [useAAD]"
+```
+
+La sauvegarde des PVCs est donc gérée via **CSI Volume Snapshots** (`disk.csi.azure.com`) qui n'a pas besoin de VSL credentials — voir [ADR-007](ADR-007-csi-volume-snapshots.md).
 
 ---
 
@@ -174,6 +212,7 @@ Ces annotations sont injectées via les `values.yaml` du Helm chart dans `module
 - Ajoute une ressource Terraform supplémentaire (`azurerm_federated_identity_credential`)
 - L'OIDC Issuer URL doit être propagée depuis le module AKS vers le module Velero (output → variable)
 - Si le namespace ou le nom du ServiceAccount change, le `subject` du Federated Credential doit être mis à jour manuellement
+- Le chart Velero 8.x utilise `velero-server` comme nom de SA — différent de `velero` utilisé dans les versions antérieures
 
 ---
 
@@ -183,3 +222,4 @@ Ces annotations sont injectées via les `values.yaml` du Helm chart dans `module
 - [Velero Azure Workload Identity configuration](https://velero.io/docs/main/azure-config/#option-1-use-azure-workload-identity)
 - [azurerm_federated_identity_credential](https://registry.terraform.io/providers/hashicorp/azurerm/latest/docs/resources/federated_identity_credential)
 - [ADR-001 — Choix de Velero](ADR-001-velero-backup-solution.md)
+- [ADR-007 — CSI Volume Snapshots](ADR-007-csi-volume-snapshots.md)
