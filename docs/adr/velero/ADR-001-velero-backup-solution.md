@@ -4,7 +4,7 @@
 |------------|-------------------------|
 | Statut     | Accepté                 |
 | Date       | 2026-05-30              |
-| Auteur     | lamine                     |
+| Auteur     | lamine                  |
 | Contexte   | Phase 04 — US Backup DR |
 
 ---
@@ -35,11 +35,11 @@ Aucune solution de backup n'est actuellement en place. Le projet suit une **stra
 ### Option A — Velero ✅ (choisie)
 
 - Open source (Apache 2.0), maintenu activement par VMware Tanzu
-- Plugin officiel `velero-plugin-for-microsoft-azure` — support natif Azure Blob + Azure Disk Snapshots
-- Supporte le **Workload Identity** (zero-credentials) depuis la version 1.12
+- Plugin officiel `velero-plugin-for-microsoft-azure` — support natif Azure Blob
+- Supporte le **Workload Identity** (zero-credentials) via `useAAD: "true"` pour le BSL
+- Backup des PVCs via **CSI Volume Snapshots** (`disk.csi.azure.com`) — crash-consistent, incrémental
 - Granularité de restore : cluster entier, namespace, ressource individuelle, sélecteur de labels
 - Restore vers un cluster différent (scénario DR) supporté nativement
-- Backup des volumes via **kopia** (node-agent) sans agent applicatif
 - Helm chart officiel — cohérent avec l'approche d'installation existante (ingress-nginx)
 - **Coût** : gratuit (open source)
 
@@ -83,6 +83,45 @@ Aucune solution de backup n'est actuellement en place. Le projet suit une **stra
 
 ---
 
+## Architecture déployée
+
+```
+AKS Cluster
+└── namespace: velero
+    ├── Deployment: velero-server            (velero v1.15.0)
+    ├── DaemonSet:  node-agent               (kopia, tolérance workload=database)
+    ├── ServiceAccount: velero-server
+    │   ├── annotation: azure.workload.identity/client-id = <UAMI-client-id>
+    │   └── label: azure.workload.identity/use = "true"
+    └── VolumeSnapshotClass: csi-azure-vsc   (disk.csi.azure.com, label velero.io/csi-volumesnapshot-class)
+
+Azure (rg-formation-ecom-aks)
+├── Storage Account: stveleroformation
+│   └── Blob Container: velero-backups  (Cool tier via lifecycle policy)
+└── UAMI: uami-velero-formation
+    ├── Role: Storage Blob Data Contributor → Storage Account
+    └── Federated Credential: AKS OIDC → system:serviceaccount:velero:velero-server
+
+Azure (MC_rg-formation-ecom-aks_aks-ecom-formation_francecentral)
+└── Managed Disk Snapshots (CSI) — créés par disk.csi.azure.com
+    ├── velero-*-postgres-data-postgres-0
+    ├── velero-*-postgres-data-postgres-1
+    └── velero-*-postgres-data-postgres-2
+```
+
+### Flux de backup
+
+```
+01:30 UTC → Schedule daily-dev → velero-server
+                                      │
+                                      ├─ Sérialise les manifests K8s (namespace dev)
+                                      ├─ Déclenche CSI snapshots sur les PVCs PostgreSQL
+                                      │   └─ disk.csi.azure.com → Azure Managed Disk Snapshot (incrémental)
+                                      └─ Upload manifests → Azure Blob (Cool) via UAMI token OIDC
+```
+
+---
+
 ## Conséquences
 
 ### Positives
@@ -90,6 +129,7 @@ Aucune solution de backup n'est actuellement en place. Le projet suit une **stra
 - Outil standard de l'écosystème Kubernetes, large adoption en production
 - Restore granulaire (cluster / namespace / ressource) satisfait tous les critères d'acceptation
 - Workload Identity supporté — aucune credentials en clair dans le cluster
+- CSI snapshots crash-consistent pour PostgreSQL — intégrité des données garantie au niveau disque
 - DR vers un autre cluster documentable et testable
 - Coût inférieur aux alternatives enterprise ou managées
 
@@ -97,7 +137,9 @@ Aucune solution de backup n'est actuellement en place. Le projet suit une **stra
 
 - Un DaemonSet `node-agent` tourne sur chaque nœud (consommation mémoire ~100 Mi par nœud)
 - Nécessite que l'OIDC Issuer soit activé sur l'AKS (changement dans `modules/aks/cluster.tf`)
-- Le backup des volumes via kopia est un processus de copie des fichiers — il n'est pas crash-consistent pour PostgreSQL sans hook de quiesce. **Mitigation** : PostgreSQL dispose de sa propre réplication (3 replicas streaming) ; en cas de DR, la restauration depuis le backup Velero est complétée par un `pg_basebackup` si nécessaire. Les hooks Velero (pre/post) peuvent être configurés ultérieurement pour un snapshot applicatif-consistent.
+- Le plugin v1.11.0 ne supporte pas Workload Identity pour le VSL — les snapshots PVC passent par CSI (voir ADR-007)
+- Les snapshots CSI sont stockés dans le Resource Group `MC_...` (node pool) — distinct du RG principal Velero
+- La `VolumeSnapshotClass` `csi-azure-vsc` est appliquée hors Terraform — à rejouer si le cluster est recréé
 
 ---
 
@@ -106,4 +148,6 @@ Aucune solution de backup n'est actuellement en place. Le projet suit une **stra
 - [Velero Documentation](https://velero.io/docs/)
 - [velero-plugin-for-microsoft-azure](https://github.com/vmware-tanzu/velero-plugin-for-microsoft-azure)
 - [Velero Workload Identity Azure](https://velero.io/docs/main/azure-config/)
+- [Velero CSI Snapshots](https://velero.io/docs/main/csi/)
 - [ADR-003 — Workload Identity](ADR-003-workload-identity.md)
+- [ADR-007 — CSI Volume Snapshots](ADR-007-csi-volume-snapshots.md)

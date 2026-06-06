@@ -69,7 +69,7 @@ schedules:
 
   daily-dev:
     disabled: false
-    schedule: "7 18 * * *"
+    schedule: "30 1 * * *"
     useOwnerReferencesInBackup: false
     template:
       ttl: "336h"
