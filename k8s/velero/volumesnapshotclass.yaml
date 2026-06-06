@@ -5,6 +5,6 @@ metadata:
   labels:
     velero.io/csi-volumesnapshot-class: "true"
 driver: disk.csi.azure.com
-deletionPolicy: Retain
+deletionPolicy: Delete
 parameters:
   incremental: "true"

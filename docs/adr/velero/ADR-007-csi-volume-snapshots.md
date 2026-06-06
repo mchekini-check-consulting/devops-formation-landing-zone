@@ -16,6 +16,26 @@ Velero propose deux mécanismes pour sauvegarder les PersistentVolumes :
 1. **Native disk snapshots** via le plugin VSL (`VolumeSnapshotLocation`) — appelle directement l'API Azure Disk Snapshot
 2. **CSI Volume Snapshots** via la feature `EnableCSI` — utilise le driver CSI du nœud (`disk.csi.azure.com`) et la CR `VolumeSnapshot`
 
+### VSL et CSI sont deux chemins indépendants
+
+Ces deux mécanismes ne se partagent **rien** — ni le driver, ni la `VolumeSnapshotClass`, ni le mécanisme d'authentification :
+
+```
+VSL (volumeSnapshotLocation)
+    └─ velero-plugin-for-microsoft-azure appelle l'API Azure Disk directement
+       → NE passe PAS par le CSI driver
+       → NE lit PAS la VolumeSnapshotClass
+       → authentification via credentials file (incompatible Workload Identity en v1.11.0)
+
+CSI (configuration.features: EnableCSI + VolumeSnapshotClass)
+    └─ Velero crée un objet VolumeSnapshot K8s
+       → le CSI controller lit la VolumeSnapshotClass csi-azure-vsc
+       → disk.csi.azure.com appelle l'API Azure Disk
+       → authentification via kubelet identity du node pool (automatique)
+```
+
+Le bloc `volumeSnapshotLocation` présent dans `velero-values.yaml` est **ignoré** pour nos PVCs PostgreSQL dès lors que `EnableCSI` est actif et que le provisioner des PVCs est `disk.csi.azure.com`. Velero choisit automatiquement le chemin CSI pour tout volume dont le driver est CSI. Le VSL ne serait invoqué que pour des volumes avec un driver non-CSI (ancien in-tree), absent de ce cluster.
+
 Le plugin `velero-plugin-for-microsoft-azure` v1.11.0 (la version en production) prend en charge le Workload Identity (`useAAD: "true"`) **uniquement pour le BSL** (Blob Storage). Le VSL en v1.11.0 nécessite encore un fichier de credentials avec `AZURE_SUBSCRIPTION_ID` — incompatible avec notre configuration Workload Identity (zero-credentials).
 
 Lors des tests, le backup avec `snapshotVolumes: true` et VSL configuré retournait :
@@ -45,6 +65,30 @@ velero backup create
                └─ Snapshot stocké dans le Resource Group du node pool (MC_...)
 ```
 
+### Pourquoi les snapshots CSI sont crash-consistent
+
+Un snapshot est dit **crash-consistent** quand il capture l'état du disque tel qu'il serait après un crash brutal — toutes les pages disque figées au **même instant**.
+
+PostgreSQL écrit en permanence sur deux fichiers liés :
+- les **fichiers de données** (`/var/lib/postgresql/data/base/...`)
+- les **WAL** (Write-Ahead Log — journal de transactions dans `pg_wal/`)
+
+Un snapshot disque Azure fige toutes les pages atomiquement — exactement comme si la VM avait crashé à cet instant. PostgreSQL sait récupérer depuis cet état via son crash recovery (replay des WAL au démarrage). C'est suffisant sans avoir besoin d'un `CHECKPOINT` applicatif avant le snapshot.
+
+À l'opposé, kopia (file-level) copie les fichiers **séquentiellement** :
+
+```
+kopia copie fichier par fichier :
+  t=0 : copie data/base/.../1259   (page 7 = version A)
+  t=1 : PostgreSQL modifie la page 7 (version B)
+  t=2 : copie pg_wal/000001        (WAL référence version B)
+  → data=A mais WAL=B → incohérence → corruption garantie
+```
+
+Le snapshot disque (CSI) capture tout en une seule opération atomique — pas de risque de décalage entre data et WAL.
+
+---
+
 ### Ressources K8s créées
 
 **`k8s/velero/volumesnapshotclass.yaml`** (appliqué manuellement via `kubectl apply`) :
@@ -55,14 +99,52 @@ kind: VolumeSnapshotClass
 metadata:
   name: csi-azure-vsc
   labels:
-    velero.io/csi-volumesnapshot-class: "true"
-driver: disk.csi.azure.com
-deletionPolicy: Retain
+    velero.io/csi-volumesnapshot-class: "true"  # Velero utilise cette classe pour ses snapshots CSI
+driver: disk.csi.azure.com                       # driver qui crée le snapshot physique Azure
+deletionPolicy: Retain                           # snapshot Azure survit si la CR K8s est supprimée
 parameters:
-  incremental: "true"
+  incremental: "true"                            # seules les pages modifiées sont copiées
 ```
 
-Le label `velero.io/csi-volumesnapshot-class: "true"` indique à Velero d'utiliser cette classe pour créer les snapshots CSI.
+**Explication des champs clés :**
+
+- **`driver`** — quel CSI driver crée le snapshot physique. `disk.csi.azure.com` est installé sur chaque nœud AKS par défaut.
+- **`deletionPolicy: Retain`** — si le `VolumeSnapshot` K8s est supprimé, le snapshot Azure Disk **survit**. Avec `Delete`, la suppression de la CR déclenche la suppression du snapshot Azure (utile pour la rétention automatique — à envisager en production).
+- **`incremental: "true"`** — Azure ne copie que les pages modifiées depuis le dernier snapshot. Un disque de 2 Gi avec peu de changements peut générer un snapshot de quelques Mo seulement.
+- **`velero.io/csi-volumesnapshot-class: "true"`** — sans ce label, Velero ignore cette classe et ne sait pas quoi utiliser. C'est le seul moyen pour Velero de découvrir quelle `VolumeSnapshotClass` utiliser.
+
+**Cycle de vie complet — création, rétention et suppression :**
+
+```
+Velero backup create
+    │
+    ├─ crée VolumeSnapshot (namespaced, dans "dev")
+    │       │
+    │       └─ CSI controller lit VolumeSnapshotClass "csi-azure-vsc"
+    │               │
+    │               └─ disk.csi.azure.com appelle Azure API
+    │                       │
+    │                       └─ crée Azure Managed Disk Snapshot (dans MC_...)
+    │                               │
+    │                               └─ retourne snapshotHandle (ID Azure)
+    │
+    └─ crée VolumeSnapshotContent (cluster-level)
+            └─ stocke snapshotHandle
+            └─ status.readyToUse = true
+
+Velero backup expire (J+14)
+    │
+    └─ supprime VolumeSnapshot
+            │
+            └─ deletionPolicy: Delete → supprime VolumeSnapshotContent
+                    │
+                    └─ disk.csi.azure.com supprime le snapshot Azure dans MC_...
+
+Au restore :
+    Velero lit le VolumeSnapshotContent
+    → disk.csi.azure.com recrée un disque Azure depuis le snapshot
+    → le PVC est recréé avec les données PostgreSQL intactes
+```
 
 ### Configuration Velero activée
 
