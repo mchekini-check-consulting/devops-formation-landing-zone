@@ -16,9 +16,8 @@ resource "azurerm_role_assignment" "velero_blob" {
 
 # Lien entre le ServiceAccount K8s "velero" (namespace velero) et l'UAMI Azure
 resource "azurerm_federated_identity_credential" "velero" {
-  name                = "fedcred-velero-${var.team_name}"
-  resource_group_name = var.resource_group_name
-  parent_id           = azurerm_user_assigned_identity.velero.id
+  name                      = "fedcred-velero-${var.team_name}"
+  user_assigned_identity_id = azurerm_user_assigned_identity.velero.id
 
   issuer   = var.aks_oidc_issuer_url
   subject  = "system:serviceaccount:velero:velero-server"

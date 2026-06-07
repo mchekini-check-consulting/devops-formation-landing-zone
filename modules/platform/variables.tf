@@ -45,3 +45,14 @@ variable "velero_uami_client_id" {
   description = "Client ID de l'UAMI Velero (annotation Workload Identity sur le ServiceAccount K8s)"
   type        = string
 }
+
+variable "key_vault_id" {
+  description = "ID du Key Vault hub pour stocker les secrets SonarQube"
+  type        = string
+}
+
+variable "sonarqube_chart_version" {
+  description = "Version du chart Helm SonarQube (SonarSource). Vérifier la dernière version : helm search repo sonarqube/sonarqube"
+  type        = string
+  default     = "2026.3.1"
+}

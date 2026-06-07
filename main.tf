@@ -59,6 +59,8 @@ module "platform" {
   velero_resource_group    = module.velero.resource_group_name
   velero_subscription_id   = module.velero.subscription_id
   velero_uami_client_id    = module.velero.uami_client_id
+
+  key_vault_id = module.hub.key_vault_id
 }
 
 module "spoke" {
