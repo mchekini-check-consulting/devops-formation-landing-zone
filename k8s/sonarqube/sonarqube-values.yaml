@@ -1,0 +1,73 @@
+community:
+  enabled: true
+
+replicaCount: 1
+
+image:
+  pullPolicy: IfNotPresent
+
+# Exposition via Azure LoadBalancer (IP publique assignée par AKS)
+# Pour un LB interne (intra-VNet), décommenter l'annotation ci-dessous
+service:
+  type: LoadBalancer
+  externalPort: 9000
+  internalPort: 9000
+  annotations: {}
+  # annotations:
+  #   service.beta.kubernetes.io/azure-load-balancer-internal: "true"
+
+ingress:
+  enabled: false
+
+resources:
+  limits:
+    cpu: 800m
+    memory: 4Gi
+  requests:
+    cpu: 400m
+    memory: 2Gi
+
+jvmOpts: "-Xmx3072m -Xms512m"
+jvmCEOpts: "-Xmx512m -Xms512m"
+
+# Paramètres noyau requis par Elasticsearch (embarqué dans SonarQube)
+initSysctl:
+  enabled: true
+  vmMaxMapCount: 524288
+  fsFileMax: 131072
+  nofile: 131072
+  nproc: 8192
+
+persistence:
+  enabled: true
+  storageClass: "managed-premium"
+  accessMode: ReadWriteOnce
+  size: 10Gi
+
+# Valeurs injectées par Terraform (templatefile)
+monitoringPasscode: "${monitoring_passcode}"
+
+account:
+  adminPassword: "${sonar_admin_password}"
+  currentAdminPassword: "admin"
+
+# PostgreSQL embarqué (Bitnami subchart) — suffisant pour env formation
+# Pour la production, désactiver et pointer sur Azure Database for PostgreSQL
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "${pg_password}"
+    username: sonarqube
+    password: "${pg_password}"
+    database: sonarqube
+  primary:
+    persistence:
+      enabled: true
+      storageClass: "managed-premium"
+      size: 20Gi
+
+prometheusExporter:
+  enabled: false
+
+plugins:
+  install: []

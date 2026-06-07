@@ -44,20 +44,13 @@ variable "velero_uami_client_id" {
   type        = string
 }
 
-variable "project_name" {
-  description = "Nom du projet"
+variable "key_vault_id" {
+  description = "ID du Key Vault hub pour stocker les secrets SonarQube"
   type        = string
 }
 
-variable "location" {
-  description = "Region Azure"
+variable "sonarqube_chart_version" {
+  description = "Version du chart Helm SonarQube (SonarSource). Vérifier la dernière version : helm search repo sonarqube/sonarqube"
   type        = string
-  default     = "francecentral"
+  default     = "2026.3.1"
 }
-
-variable "oidc_issuer_url" {
-  description = "URL de l'emetteur OIDC du cluster AKS"
-  type        = string
-}
-
-
