@@ -21,10 +21,10 @@ data:
     # --- catalogue ---
     [pools.catalogue]
     pool_mode = "transaction"
-    default_role = "primary"
+    default_role = "any"
     application_name = "pgcat"
-    query_parser_enabled = false
-    primary_reads_enabled = true
+    query_parser_enabled = true
+    primary_reads_enabled = false
 
     [pools.catalogue.users.formation]
     username = "formation"
@@ -37,7 +37,8 @@ data:
     [pools.catalogue.shards.0]
     database = "catalogue"
     servers = [
-      ["postgres-primary.dev.svc.cluster.local", 5432, "primary"]
+      ["postgres-primary.dev.svc.cluster.local", 5432, "primary"],
+      ["postgres-read.dev.svc.cluster.local",    5432, "replica"]
     ]
 
     # --- order ---
