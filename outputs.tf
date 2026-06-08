@@ -17,21 +17,33 @@ output "acr_id" {
   value       = module.hub.acr_id
 }
 
+
 #--------------------------------------------------------------
-# PostgreSQL Outputs
+# AKS Outputs
 #--------------------------------------------------------------
 
-output "postgres_fqdns" {
-  description = "FQDNs des serveurs PostgreSQL par environnement (utilisez ces URLs pour vous connecter)"
-  value       = module.spoke.postgres_fqdns
+output "aks_kubeconfig" {
+  description = "Kubeconfig du cluster AKS"
+  value       = module.aks.kubeconfig
+  sensitive   = true
 }
 
-output "postgres_server_ids" {
-  description = "IDs des serveurs PostgreSQL par environnement"
-  value       = module.spoke.postgres_server_ids
+#--------------------------------------------------------------
+# Backup Outputs
+#--------------------------------------------------------------
+
+output "backup_identity_client_id" {
+  description = "Client ID de la Managed Identity backup — à mettre dans k8s/postgres-backup/serviceaccount.yaml"
+  value       = module.platform.backup_identity_client_id
 }
 
-output "postgres_server_names" {
-  description = "Noms des serveurs PostgreSQL par environnement"
-  value       = module.spoke.postgres_server_names
+output "sonarqube_namespace" {
+  description = "Namespace K8s SonarQube — kubectl get svc -n <namespace> sonarqube-sonarqube pour récupérer l'IP du LoadBalancer"
+  value       = module.platform.sonarqube_namespace
 }
+
+output "sonarqube_admin_secret_name" {
+  description = "Nom du secret Key Vault contenant le mot de passe admin SonarQube"
+  value       = module.platform.sonarqube_admin_secret_name
+}
+

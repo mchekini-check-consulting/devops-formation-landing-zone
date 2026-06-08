@@ -87,18 +87,6 @@ resource "azurerm_network_security_group" "apim" {
     destination_address_prefix = "10.1.1.0/24"
   }
 
-  security_rule {
-    name                       = "Allow-Keycloak-Outbound"
-    priority                   = 140
-    direction                  = "Outbound"
-    access                     = "Allow"
-    protocol                   = "Tcp"
-    source_port_range          = "*"
-    destination_port_range     = "8443"
-    source_address_prefix      = "VirtualNetwork"
-    destination_address_prefix = local.keycloak_subnet_prefix
-  }
-
   tags = merge(local.common_tags, { Function = "apim" })
 }
 
@@ -246,19 +234,6 @@ resource "azurerm_api_management_api_operation" "catchall_patch" {
   }
 }
 
-resource "azurerm_api_management_backend" "keycloak" {
-  name                = "keycloak-backend"
-  api_management_name = azurerm_api_management.main.name
-  resource_group_name = azurerm_resource_group.devops.name
-  protocol            = "http"
-  url                 = "https://${azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address}:8443"
-
-  tls {
-    validate_certificate_chain = false
-    validate_certificate_name  = false
-  }
-}
-
 resource "azurerm_api_management_api_operation_policy" "payments_post_policy" {
   api_management_name = azurerm_api_management.main.name
   resource_group_name = azurerm_resource_group.devops.name
@@ -315,7 +290,6 @@ resource "azurerm_api_management_api_policy" "routing" {
   resource_group_name = azurerm_resource_group.devops.name
 
   depends_on = [
-    azurerm_api_management_backend.keycloak,
     azurerm_api_management_named_value.catalog_rate_limit,
     azurerm_api_management_named_value.order_rate_limit,
     azurerm_api_management_named_value.payment_rate_limit,

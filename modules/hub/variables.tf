@@ -32,40 +32,27 @@ variable "readers_group_object_id" {
   type = string
 }
 
-variable "keycloak_vm_size" {
-  description = "Gabarit de la VM keycloak"
-  type        = string
-}
-
-variable "keycloak_vm_admin_username" {
-  description = "Utilisateur administrateur des VMs linux"
-  type        = string
-}
-
 variable "apim_publisher_email" {
   description = "Email du publisher pour Azure API Management"
   type        = string
 }
 
-variable "front_vm_identity_principal_ids" {
-  description = "Principal IDs des identités managées des VMs front (pour accès Key Vault)"
-  type        = list(string)
-  default     = []
-}
-
 variable "frontend_public_ip" {
-  description = "IP publique de la VM front (pour CORS APIM)"
+  description = "IP publique du frontend (pour CORS APIM) - sera remplacee par l'IP AKS"
   type        = string
+  default     = ""
 }
 
 variable "backend_vm_ip" {
-  description = "IP privée de la VM back (depuis le spoke)"
+  description = "IP du backend (pour routage APIM) - sera remplacee par l'IP AKS"
   type        = string
+  default     = ""
 }
 
 variable "payment_lb_ip" {
-  description = "IP privée du Load Balancer payment (depuis le spoke)"
+  description = "IP du service payment (pour routage APIM) - sera remplacee par l'IP AKS"
   type        = string
+  default     = ""
 }
 
 variable "fraud_check_function_urls" {
