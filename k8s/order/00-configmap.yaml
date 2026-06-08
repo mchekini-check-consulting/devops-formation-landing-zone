@@ -8,7 +8,7 @@ metadata:
 data:
   DJANGO_SETTINGS_MODULE: "config.settings.prod"
   DJANGO_ALLOWED_HOSTS: "*"
-  POSTGRES_HOST: "pgpool.dev.svc.cluster.local"
+  POSTGRES_HOST: "pgcat.dev.svc.cluster.local"
   POSTGRES_PORT: "5432"
   POSTGRES_DB: "order"
   POSTGRES_SSLMODE: "disable"

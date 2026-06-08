@@ -20,10 +20,28 @@ spec:
       labels:
         app: order
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: order
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.azure.com/agentpool
+                    operator: In
+                    values:
+                      - apps
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: order
@@ -33,6 +51,17 @@ spec:
           labelSelector:
             matchLabels:
               app: order
+      initContainers:
+        - name: migrate
+          image: crformation.azurecr.io/ecommerce-order:2.0
+          imagePullPolicy: Always
+          command: ["python", "manage.py", "migrate", "--no-input"]
+          envFrom:
+            - configMapRef:
+                name: order-config
+            - secretRef:
+                name: order-secret
+
       containers:
         - name: order
           image: crformation.azurecr.io/ecommerce-order:2.0

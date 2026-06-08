@@ -15,8 +15,12 @@ spec:
     metadata:
       labels:
         app: postgres
+        patroni-cluster: postgres-cluster
     spec:
-      # --- Scheduling ---
+      serviceAccountName: postgres-patroni
+      automountServiceAccountToken: true
+
+
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
@@ -40,62 +44,39 @@ spec:
           value: database
           effect: NoSchedule
 
-      # --- Init container : configure les replicas via pg_basebackup ---
-      initContainers:
-        - name: init-replica
-          image: postgres:16
-          command: ["/bin/bash", "/scripts/init-replica.sh"]
-          env:
-            - name: POD_NAME
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.name
-            - name: NAMESPACE
-              valueFrom:
-                fieldRef:
-                  fieldPath: metadata.namespace
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-            - name: REPLICATION_PASSWORD
-              valueFrom:
-                secretKeyRef:
-                  name: postgres-credentials
-                  key: REPLICATION_PASSWORD
-          volumeMounts:
-            - name: pgdata
-              mountPath: /var/lib/postgresql/data
-            - name: scripts
-              mountPath: /scripts
-
-      # --- Container principal ---
       containers:
         - name: postgres
-          image: postgres:16
-          args:
-            - -c
-            - config_file=/etc/postgresql/postgresql.conf
-            - -c
-            - hba_file=/etc/postgresql/pg_hba.conf
+          image: ghcr.io/zalando/spilo-16:3.3-p1
           ports:
             - name: postgres
               containerPort: 5432
+            - name: patroni
+              containerPort: 8008
           env:
-            - name: POD_NAME
+            - name: SCOPE
+              value: postgres-cluster
+            - name: PGROOT
+              value: /home/postgres/pgdata
+            - name: PATRONI_KUBERNETES_POD_IP
               valueFrom:
                 fieldRef:
-                  fieldPath: metadata.name
-            - name: NAMESPACE
+                  fieldPath: status.podIP
+            - name: PATRONI_KUBERNETES_NAMESPACE
               valueFrom:
                 fieldRef:
                   fieldPath: metadata.namespace
-            - name: PGDATA
-              value: /var/lib/postgresql/data/pgdata
-            - name: POSTGRES_PASSWORD
+            - name: PATRONI_KUBERNETES_LABELS
+              value: '{"app": "postgres", "patroni-cluster": "postgres-cluster"}'
+            - name: PATRONI_SUPERUSER_USERNAME
+              value: postgres
+            - name: PGPASSWORD_SUPERUSER
               valueFrom:
                 secretKeyRef:
                   name: postgres-credentials
                   key: POSTGRES_PASSWORD
-            - name: REPLICATION_PASSWORD
+            - name: PGUSER_STANDBY
+              value: replicator
+            - name: PGPASSWORD_STANDBY
               valueFrom:
                 secretKeyRef:
                   name: postgres-credentials
@@ -110,32 +91,51 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: RESTORE_PASSWORD
-          volumeMounts:
-            - name: pgdata
-              mountPath: /var/lib/postgresql/data
-            - name: config
-              mountPath: /etc/postgresql
-            - name: scripts
-              mountPath: /docker-entrypoint-initdb.d/init-users.sh
-              subPath: init-users.sh
-            - name: scripts
-              mountPath: /tmp/seed-data.sh
-              subPath: seed-data.sh
-            - name: scripts
-              mountPath: /scripts/liveness-check.sh
-              subPath: liveness-check.sh
+            - name: SPILO_CONFIGURATION
+              value: |
+                kubernetes:
+                  namespace: dev
+                  labels:
+                    app: postgres
+                    patroni-cluster: postgres-cluster
+                  scope_label: patroni-cluster
+                  role_label: spilo-role
+                  use_endpoints: false
+                bootstrap:
+                  post_init: /patroni-scripts/init-users.sh
+                  dcs:
+                    ttl: 30
+                    loop_wait: 10
+                    retry_timeout: 10
+                    maximum_lag_on_failover: 1048576
+                    postgresql:
+                      use_pg_rewind: true
+                      parameters:
+                        max_connections: 150
+                        wal_keep_size: 128MB
+                        hot_standby_feedback: on
+
+          startupProbe:
+            httpGet:
+              path: /liveness
+              port: 8008
+            failureThreshold: 30
+            periodSeconds: 10
+
           readinessProbe:
-            exec:
-              command: ["pg_isready", "-U", "postgres"]
-            initialDelaySeconds: 10
+            httpGet:
+              path: /readiness
+              port: 8008
             periodSeconds: 5
             failureThreshold: 6
+
           livenessProbe:
-            exec:
-              command: ["/bin/bash", "/scripts/liveness-check.sh"]
-            initialDelaySeconds: 30
+            httpGet:
+              path: /liveness
+              port: 8008
             periodSeconds: 10
-            failureThreshold: 3
+            failureThreshold: 6
+
           resources:
             requests:
               cpu: 250m
@@ -144,30 +144,21 @@ spec:
               cpu: 1000m
               memory: 1Gi
 
+          volumeMounts:
+            - name: pgdata
+              mountPath: /home/postgres/pgdata
+            - name: patroni-scripts
+              mountPath: /patroni-scripts
+
       volumes:
-        - name: config
-          configMap:
-            name: postgres-config
-            items:
-              - key: postgresql.conf
-                path: postgresql.conf
-              - key: pg_hba.conf
-                path: pg_hba.conf
-        - name: scripts
+        - name: patroni-scripts
           configMap:
             name: postgres-config
             defaultMode: 0755
             items:
-              - key: init-replica.sh
-                path: init-replica.sh
               - key: init-users.sh
                 path: init-users.sh
-              - key: seed-data.sh
-                path: seed-data.sh
-              - key: liveness-check.sh
-                path: liveness-check.sh
 
-  # --- Un PVC de 20Gi par pod ---
   volumeClaimTemplates:
     - metadata:
         name: pgdata
