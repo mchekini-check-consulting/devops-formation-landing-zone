@@ -20,10 +20,28 @@ spec:
       labels:
         app: catalogue
     spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              podAffinityTerm:
+                labelSelector:
+                  matchLabels:
+                    app: catalogue
+                topologyKey: kubernetes.io/hostname
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: kubernetes.azure.com/agentpool
+                    operator: In
+                    values:
+                      - apps
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: DoNotSchedule
+          whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels:
               app: catalogue
@@ -33,6 +51,26 @@ spec:
           labelSelector:
             matchLabels:
               app: catalogue
+      initContainers:
+        - name: sync-db
+          image: crformation.azurecr.io/ecommerce-catalogue:2.0
+          imagePullPolicy: Always
+          command: ["/bin/sh", "-c", "timeout 30 node /app/src/app.js; exit 0"]
+          env:
+            - name: DB_HOST
+              value: "postgres-primary.dev.svc.cluster.local"
+            - name: DB_SSL
+              value: "true"
+            - name: PGSSLMODE
+              value: "no-verify"
+            - name: NODE_TLS_REJECT_UNAUTHORIZED
+              value: "0"
+          envFrom:
+            - configMapRef:
+                name: catalogue-config
+            - secretRef:
+                name: catalogue-secret
+
       containers:
         - name: catalogue
           image: crformation.azurecr.io/ecommerce-catalogue:2.0
