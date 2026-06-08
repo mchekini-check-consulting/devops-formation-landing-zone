@@ -28,6 +28,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
     service_cidr   = "172.16.0.0/16"
     dns_service_ip = "172.16.0.10"
   }
+
+  workload_autoscaler_profile {
+    vertical_pod_autoscaler_enabled = true
+  }
 }
 
 resource "azurerm_role_assignment" "aks_acr_pull" {

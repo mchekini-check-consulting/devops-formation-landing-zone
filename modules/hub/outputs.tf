@@ -29,26 +29,6 @@ output "key_vault_name" {
   value = azurerm_key_vault.main.name
 }
 
-output "keycloak_private_ip" {
-  description = "Private IP address of the Keycloak VM"
-  value       = azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address
-}
-
-output "keycloak_subnet_id" {
-  description = "Subnet ID where Keycloak is deployed"
-  value       = azurerm_subnet.keycloak.id
-}
-
-output "keycloak_internal_url" {
-  description = "Internal URL to access Keycloak from VNet"
-  value       = "https://${azurerm_network_interface.keycloak.ip_configuration[0].private_ip_address}:8443"
-}
-
-output "keycloak_vm_name" {
-  description = "Name of the Keycloak VM"
-  value       = azurerm_linux_virtual_machine.keycloak.name
-}
-
 output "apim_public_ip" {
   description = "IP publique de l'APIM pour les tests depuis le navigateur"
   value       = azurerm_api_management.main.public_ip_addresses[0]

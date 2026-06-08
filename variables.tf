@@ -59,19 +59,6 @@ variable "apim_publisher_email" {
 }
 
 
-variable "keycloak_vm_size" {
-  description = "Gabarit de la VM keycloak"
-  type        = string
-  default     = "Standard_B2s"
-}
-
-variable "keycloak_vm_admin_username" {
-  description = "Utilisateur administrateur des VMs linux"
-  type        = string
-  default     = "azureuser"
-}
-
-
 variable "fraud_amount_limit" {
   description = "Montant maximum autorisé par paiement (en euros). Tout montant supérieur est bloqué."
   type        = number

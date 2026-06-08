@@ -1,6 +1,4 @@
 locals {
-  keycloak_subnet_prefix = cidrsubnet(var.address_space, 8, 10)
-
   common_tags = merge(var.tags, {
     ManagedBy = "Terraform"
   })
@@ -40,13 +38,6 @@ resource "azurerm_virtual_network" "main" {
   location            = azurerm_resource_group.network.location
   address_space = [var.address_space]
   tags                = local.common_tags
-}
-
-resource "azurerm_subnet" "keycloak" {
-  name                 = "subnet-keycloak-hub"
-  resource_group_name  = azurerm_resource_group.network.name
-  virtual_network_name = azurerm_virtual_network.main.name
-  address_prefixes     = [local.keycloak_subnet_prefix]
 }
 
 resource "azurerm_subnet" "subnet-apim" {
