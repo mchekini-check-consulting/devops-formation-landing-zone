@@ -1,0 +1,94 @@
+namespace: dev
+
+image:
+  repository: crformation.azurecr.io/ecommerce-order
+  tag: "2.0"
+  pullPolicy: Always
+
+replicaCount: 2
+
+strategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxSurge: "25%"
+    maxUnavailable: 0
+
+affinity:
+  nodepool: apps
+
+service:
+  type: ClusterIP
+  port: 8000
+
+probes:
+  path: /api/health
+  startup:
+    periodSeconds: 10
+    failureThreshold: 6
+  liveness:
+    periodSeconds: 15
+    failureThreshold: 3
+  readiness:
+    periodSeconds: 5
+    failureThreshold: 3
+
+resources:
+  requests:
+    cpu: 250m
+    memory: 512Mi
+  limits:
+    cpu: "1"
+    memory: 1Gi
+
+# initContainer migrate: applies Django DB migrations against postgres-primary before pod starts
+initContainer:
+  enabled: true
+  name: migrate
+  command:
+    - python
+    - manage.py
+    - migrate
+    - --no-input
+  env:
+    - name: POSTGRES_HOST
+      value: "postgres-primary.dev.svc.cluster.local"
+
+configmap:
+  DJANGO_SETTINGS_MODULE: "config.settings.prod"
+  DJANGO_ALLOWED_HOSTS: "*"
+  POSTGRES_HOST: "pgcat.dev.svc.cluster.local"
+  POSTGRES_PORT: "5432"
+  POSTGRES_DB: "order"
+  POSTGRES_SSLMODE: "disable"
+  CORS_ALLOW_ALL_ORIGINS: "TRUE"
+  LOG_LEVEL: "INFO"
+  ENV_NAME: "prod"
+
+secret:
+  POSTGRES_USER: formation
+  POSTGRES_PASSWORD: test
+  DJANGO_SECRET_KEY: "django-insecure-aks-dev-change-in-prod"
+  APPLICATIONINSIGHTS_CONNECTION_STRING: "InstrumentationKey=1311ad53-6ac0-4946-bb2f-48c60120bbd9;IngestionEndpoint=https://francecentral-1.in.applicationinsights.azure.com/;LiveEndpoint=https://francecentral.livediagnostics.monitor.azure.com/;ApplicationId=d9efc03e-0523-42cc-9e0e-1ea237ed1ba4"
+
+pdb:
+  minAvailable: 1
+
+hpa:
+  minReplicas: 2
+  maxReplicas: 4
+  cpu:
+    averageUtilization: 70
+  memory:
+    averageUtilization: 80
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      percent: 100
+      periodSeconds: 60
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      percent: 25
+      periodSeconds: 60
+
+vpa:
+  updateMode: "Off"

@@ -1,0 +1,6 @@
+apiVersion: v2
+name: order
+description: Order microservice — Django order management API
+type: application
+version: 1.0.0
+appVersion: "2.0"
