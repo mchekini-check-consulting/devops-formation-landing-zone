@@ -45,5 +45,5 @@ architecture-auto.mmd
 /k8s/netpol/
 /k8s/payment/
 /k8s/order/
-
+/k8s/sonarqube/
 
