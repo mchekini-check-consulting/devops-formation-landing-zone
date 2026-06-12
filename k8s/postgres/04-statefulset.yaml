@@ -1,0 +1,158 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: dev
+  labels:
+    app: postgres
+spec:
+  serviceName: postgres
+  replicas: 3
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      # --- Scheduling ---
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels:
+              app: postgres
+
+      nodeSelector:
+        workload: database
+
+      tolerations:
+        - key: workload
+          operator: Equal
+          value: database
+          effect: NoSchedule
+
+      # --- Init container : configure les replicas via pg_basebackup ---
+      initContainers:
+        - name: init-replica
+          image: postgres:16
+          command: ["/bin/bash", "/scripts/init-replica.sh"]
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: REPLICATION_PASSWORD
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: scripts
+              mountPath: /scripts
+
+      # --- Container principal ---
+      containers:
+        - name: postgres
+          image: postgres:16
+          args:
+            - -c
+            - config_file=/etc/postgresql/postgresql.conf
+            - -c
+            - hba_file=/etc/postgresql/pg_hba.conf
+          ports:
+            - name: postgres
+              containerPort: 5432
+          env:
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+            - name: NAMESPACE
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.namespace
+            - name: PGDATA
+              value: /var/lib/postgresql/data/pgdata
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: POSTGRES_PASSWORD
+            - name: REPLICATION_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: REPLICATION_PASSWORD
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: config
+              mountPath: /etc/postgresql
+            - name: scripts
+              mountPath: /docker-entrypoint-initdb.d/init-users.sh
+              subPath: init-users.sh
+            - name: scripts
+              mountPath: /scripts/liveness-check.sh
+              subPath: liveness-check.sh
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "postgres"]
+            initialDelaySeconds: 10
+            periodSeconds: 5
+            failureThreshold: 6
+          livenessProbe:
+            exec:
+              command: ["/bin/bash", "/scripts/liveness-check.sh"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+          resources:
+            requests:
+              cpu: 250m
+              memory: 256Mi
+            limits:
+              cpu: 1000m
+              memory: 1Gi
+
+      volumes:
+        - name: config
+          configMap:
+            name: postgres-config
+            items:
+              - key: postgresql.conf
+                path: postgresql.conf
+              - key: pg_hba.conf
+                path: pg_hba.conf
+        - name: scripts
+          configMap:
+            name: postgres-config
+            defaultMode: 0755
+            items:
+              - key: init-replica.sh
+                path: init-replica.sh
+              - key: init-users.sh
+                path: init-users.sh
+              - key: liveness-check.sh
+                path: liveness-check.sh
+
+  # --- Un PVC de 20Gi par pod ---
+  volumeClaimTemplates:
+    - metadata:
+        name: pgdata
+      spec:
+        accessModes: [ReadWriteOnce]
+        storageClassName: postgres-standard-ssd
+        resources:
+          requests:
+            storage: 2Gi
