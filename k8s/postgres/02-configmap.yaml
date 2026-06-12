@@ -25,6 +25,8 @@ data:
     set -e
     psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
       CREATE USER replicator WITH REPLICATION ENCRYPTED PASSWORD '${REPLICATION_PASSWORD}';
+      CREATE USER backup WITH ENCRYPTED PASSWORD '${BACKUP_PASSWORD}';
+      GRANT pg_read_all_data TO backup;
     EOSQL
 
   liveness-check.sh: |

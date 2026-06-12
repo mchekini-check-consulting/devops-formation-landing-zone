@@ -30,11 +30,15 @@ module "aks" {
   team_name    = var.team_name
   project_name = "ecom"
   location     = var.location
+  acr_id       = module.hub.acr_id
 }
 
 module "platform" {
-  source         = "./modules/platform"
-  kubeconfig_path = "~/.kube/config"
+  source       = "./modules/platform"
+  team_name    = var.team_name
+  project_name    = "ecom"
+  location        = var.location
+  oidc_issuer_url = module.aks.oidc_issuer_url
 }
 
 module "spoke" {

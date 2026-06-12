@@ -94,6 +94,11 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: REPLICATION_PASSWORD
+            - name: BACKUP_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: BACKUP_PASSWORD
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
