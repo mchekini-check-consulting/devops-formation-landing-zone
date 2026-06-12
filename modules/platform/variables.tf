@@ -54,3 +54,9 @@ variable "sonarqube_chart_version" {
   type        = string
   default     = "2026.3.1"
 }
+
+variable "kubeconfig_path" {
+  description = "Chemin vers le fichier kubeconfig"
+  type        = string
+  default     = "~/.kube/config"
+}
