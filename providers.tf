@@ -8,6 +8,10 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.0"
     }
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
 }
 
 
@@ -24,6 +28,8 @@ provider "azurerm" {
   features {}
   resource_provider_registrations = "none"
 }
+
+provider "azuread" {}
 
 provider "helm" {
   kubernetes {

@@ -60,3 +60,8 @@ output "devops_resource_group_name" {
   description = "Nom du resource group hub devops (ACR, Managed Identities DevOps)"
   value       = azurerm_resource_group.devops.name
 }
+
+output "devops_resource_group_id" {
+  description = "ID du resource group hub devops"
+  value       = azurerm_resource_group.devops.id
+}

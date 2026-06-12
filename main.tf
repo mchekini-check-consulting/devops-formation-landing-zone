@@ -60,6 +60,24 @@ module "platform" {
   key_vault_id = module.hub.key_vault_id
 }
 
+module "cicd_identity" {
+  source = "./modules/cicd-identity"
+
+  team_name   = var.team_name
+  github_org  = "mchekini-check-consulting"
+  github_repositories = [
+    "devops-formation-catalogue",
+    "devops-formation-order",
+    "devops-formation-payment",
+    "devops-formation-landing-zone",
+    "devops-formation-utils",
+  ]
+
+  acr_id            = module.hub.acr_id
+  aks_id            = module.aks.aks_id
+  resource_group_id = module.hub.devops_resource_group_id
+}
+
 module "spoke" {
 
   source = "./modules/spoke"
