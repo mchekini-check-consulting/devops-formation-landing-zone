@@ -17,21 +17,13 @@ output "acr_id" {
   value       = module.hub.acr_id
 }
 
+
 #--------------------------------------------------------------
-# PostgreSQL Outputs
+# AKS Outputs
 #--------------------------------------------------------------
 
-output "postgres_fqdns" {
-  description = "FQDNs des serveurs PostgreSQL par environnement (utilisez ces URLs pour vous connecter)"
-  value       = module.spoke.postgres_fqdns
-}
-
-output "postgres_server_ids" {
-  description = "IDs des serveurs PostgreSQL par environnement"
-  value       = module.spoke.postgres_server_ids
-}
-
-output "postgres_server_names" {
-  description = "Noms des serveurs PostgreSQL par environnement"
-  value       = module.spoke.postgres_server_names
+output "aks_kubeconfig" {
+  description = "Kubeconfig du cluster AKS"
+  value       = module.aks.kubeconfig
+  sensitive   = true
 }
