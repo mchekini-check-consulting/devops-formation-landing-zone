@@ -47,6 +47,20 @@ module "velero" {
   }
 }
 
+module "velero" {
+  source              = "./modules/velero"
+  team_name           = var.team_name
+  location            = var.location
+  resource_group_name = module.aks.resource_group_name
+  aks_oidc_issuer_url = module.aks.oidc_issuer_url
+
+  tags = {
+    managed_by  = "terraform"
+    team        = var.team_name
+    component   = "backup"
+  }
+}
+
 module "platform" {
   source       = "./modules/platform"
   team_name    = var.team_name

@@ -50,7 +50,7 @@ spec:
               memory: 512Mi
           env:
             - name: BACKUP_FILENAME
-              value: "20260601-231514.tar"
+              value: "${BACKUP_FILENAME}"
             - name: PG_HOST
               value: postgres-primary.dev.svc.cluster.local
             - name: PG_USER

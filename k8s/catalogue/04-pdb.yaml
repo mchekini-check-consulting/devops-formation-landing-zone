@@ -1,12 +1,12 @@
 apiVersion: policy/v1
 kind: PodDisruptionBudget
 metadata:
-  name: pgpool
+  name: catalogue
   namespace: dev
   labels:
-    app: pgpool
+    app: catalogue
 spec:
   minAvailable: 1
   selector:
     matchLabels:
-      app: pgpool
+      app: catalogue

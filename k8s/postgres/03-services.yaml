@@ -1,8 +1,6 @@
 ---
-# Headless Service — résolution DNS par pod
+# Headless — résolution DNS par pod pour Patroni
 # postgres-0.postgres.dev.svc.cluster.local
-# postgres-1.postgres.dev.svc.cluster.local
-# postgres-2.postgres.dev.svc.cluster.local
 apiVersion: v1
 kind: Service
 metadata:
@@ -18,10 +16,12 @@ spec:
     - name: postgres
       port: 5432
       targetPort: 5432
+    - name: patroni
+      port: 8008
+      targetPort: 8008
 
 ---
-# Service Primary — writes uniquement (postgres-0)
-# Le label statefulset.kubernetes.io/pod-name est posé automatiquement par K8s
+# Primary — Patroni pose le label spilo-role=master sur le pod élu
 apiVersion: v1
 kind: Service
 metadata:
@@ -32,14 +32,15 @@ metadata:
     role: primary
 spec:
   selector:
-    statefulset.kubernetes.io/pod-name: postgres-0
+    app: postgres
+    spilo-role: master
   ports:
     - name: postgres
       port: 5432
       targetPort: 5432
 
 ---
-# Service Read — lectures sur tous les pods (primary + replicas)
+# Replicas — lectures uniquement
 apiVersion: v1
 kind: Service
 metadata:
@@ -51,6 +52,7 @@ metadata:
 spec:
   selector:
     app: postgres
+    spilo-role: replica
   ports:
     - name: postgres
       port: 5432
