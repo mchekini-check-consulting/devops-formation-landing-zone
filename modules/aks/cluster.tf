@@ -19,6 +19,7 @@ resource "azurerm_kubernetes_cluster" "aks" {
     vnet_subnet_id              = azurerm_subnet.aks.id
     only_critical_addons_enabled = true
     temporary_name_for_rotation = "systemtmp"
+    zones                       = ["1"]
   }
 
   network_profile {
