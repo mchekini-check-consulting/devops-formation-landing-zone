@@ -18,5 +18,3 @@ variable "oidc_issuer_url" {
   description = "URL de l'emetteur OIDC du cluster AKS"
   type        = string
 }
-
-

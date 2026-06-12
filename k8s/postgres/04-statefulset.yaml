@@ -99,6 +99,11 @@ spec:
                 secretKeyRef:
                   name: postgres-credentials
                   key: BACKUP_PASSWORD
+            - name: RESTORE_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: postgres-credentials
+                  key: RESTORE_PASSWORD
           volumeMounts:
             - name: pgdata
               mountPath: /var/lib/postgresql/data
@@ -107,6 +112,9 @@ spec:
             - name: scripts
               mountPath: /docker-entrypoint-initdb.d/init-users.sh
               subPath: init-users.sh
+            - name: scripts
+              mountPath: /tmp/seed-data.sh
+              subPath: seed-data.sh
             - name: scripts
               mountPath: /scripts/liveness-check.sh
               subPath: liveness-check.sh
@@ -148,6 +156,8 @@ spec:
                 path: init-replica.sh
               - key: init-users.sh
                 path: init-users.sh
+              - key: seed-data.sh
+                path: seed-data.sh
               - key: liveness-check.sh
                 path: liveness-check.sh
 
