@@ -66,7 +66,7 @@ module "cicd_identity" {
   team_name   = var.team_name
   github_org  = "mchekini-check-consulting"
   github_repositories = [
-    "devops-formation-catalogue",
+    "devops-formation-catalog",
     "devops-formation-order",
     "devops-formation-payment",
     "devops-formation-landing-zone",

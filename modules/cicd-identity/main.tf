@@ -10,18 +10,34 @@ resource "azuread_application" "cicd" {
 
 resource "azuread_service_principal" "cicd" {
   client_id = azuread_application.cicd.client_id
+
+  lifecycle {
+    ignore_changes = all
+  }
 }
 
-resource "azuread_application_federated_identity_credential" "github" {
+resource "azuread_application_federated_identity_credential" "github_main" {
   for_each = toset(var.github_repositories)
 
   application_id = azuread_application.cicd.id
-  display_name   = replace(each.value, "/[^a-zA-Z0-9-]/", "-")
+  display_name   = "${replace(each.value, "/[^a-zA-Z0-9-]/", "-")}-main"
   description    = "GitHub Actions OIDC for ${each.value} (main)"
 
   audiences = ["api://AzureADTokenExchange"]
   issuer    = "https://token.actions.githubusercontent.com"
   subject   = "repo:${var.github_org}/${each.value}:ref:refs/heads/main"
+}
+
+resource "azuread_application_federated_identity_credential" "github_pr" {
+  for_each = toset(var.github_repositories)
+
+  application_id = azuread_application.cicd.id
+  display_name   = "${replace(each.value, "/[^a-zA-Z0-9-]/", "-")}-pr"
+  description    = "GitHub Actions OIDC for ${each.value} (pull_request)"
+
+  audiences = ["api://AzureADTokenExchange"]
+  issuer    = "https://token.actions.githubusercontent.com"
+  subject   = "repo:${var.github_org}/${each.value}:pull_request"
 }
 
 resource "azurerm_role_assignment" "acr_push" {
