@@ -1,45 +1,54 @@
-apiVersion: apps/v1
-kind: DaemonSet
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: fluent-bit
+  name: fluent-bit-config
   namespace: logging
-  labels:
-    app: fluent-bit
-spec:
-  selector:
-    matchLabels:
-      app: fluent-bit
-  template:
-    metadata:
-      labels:
-        app: fluent-bit
-    spec:
-      tolerations:
-        - operator: Exists
-      priorityClassName: system-node-critical
-      containers:
-        - name: fluent-bit
-          image: fluent/fluent-bit:3.0
-          resources:
-            limits:
-              cpu: 100m
-              memory: 128Mi
-          volumeMounts:
-            - name: containers-logs
-              mountPath: /var/log/containers
-              readOnly: true
-            - name: pods-logs
-              mountPath: /var/log/pods
-              readOnly: true
-            - name: fluent-bit-config
-              mountPath: /fluent-bit/etc/
-      volumes:
-        - name: containers-logs
-          hostPath:
-            path: /var/log/containers
-        - name: pods-logs
-          hostPath:
-            path: /var/log/pods
-        - name: fluent-bit-config
-          configMap:
-            name: fluent-bit-config
+data:
+  fluent-bit.conf: |
+    [SERVICE]
+        Flush         5
+        Daemon        Off
+        Log_Level     info
+        Parsers_File  parsers.conf
+
+    [INPUT]
+        Name              tail
+        Path              /var/log/containers/*.log
+        Tag               kube.*
+        Refresh_Interval  5
+        Multiline         Off
+        Parser            docker
+
+    [FILTER]
+        Name             parser
+        Match            kube.*
+        Key_Name         log
+        Parser           json
+        Reserve_Data     On
+        Preserve_Key     On
+
+    [OUTPUT]
+        Name            azure
+        Match           *
+        Customer_ID     20bcc7fd-26e6-4bd4-8562-2b839db43cd5
+        Shared_Key      DDF++4RSxsJZM1DVHbYPCSM/eRdcW5zj5rzuaUdIPP+MW51C6VqFOG7m43XPnW08WYHQYpInRK/sgm3z0VOW3A==
+        Log_Type        KubernetesLogs
+
+  parsers.conf: |
+    [PARSER]
+        Name        docker
+        Format      json
+        Time_Key    time
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+        Time_Keep   On
+
+    [PARSER]
+        Name        json
+        Format      json
+        Time_Key    timestamp
+        Time_Format %Y-%m-%dT%H:%M:%S.%L
+
+    [PARSER]
+        Name        plain_text
+        Format      regex
+        Regex       ^(?<log>.*)$
