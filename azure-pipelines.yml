@@ -243,15 +243,16 @@ stages:
 
     - bash: |
         set -e
-        infracost comment azure-repos \
+        infracost comment github \
           --path /tmp/infracost-diff.json \
-          --azure-access-token "$(System.AccessToken)" \
-          --pull-request "$(System.PullRequest.PullRequestId)" \
+          --github-token "$(GITHUB_TOKEN)" \
+          --pull-request "$(System.PullRequest.PullRequestNumber)" \
           --repo-url "$(Build.Repository.Uri)" \
           --behavior update
       displayName: 'Commenter Infracost sur la PR'
       env:
         INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
 
 
 # =============================================================================
