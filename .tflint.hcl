@@ -74,7 +74,7 @@ rule "terraform_naming_convention" {
     format = "snake_case"
   }
 
-  data_source {
+  data {
     format = "snake_case"
   }
 
