@@ -88,16 +88,10 @@ stages:
       inputs:
         terraformVersion: '$(TF_VERSION)'
 
-    # TerraformTaskV4 : command custom pour exécuter fmt
-    # Échoue si un fichier .tf n'est pas correctement formaté
-    - task: TerraformTaskV4@4
+    # fmt est purement local — pas de credentials Azure requis
+    - script: terraform fmt -check -recursive -diff
       displayName: 'terraform fmt -check -recursive'
-      inputs:
-        provider: 'azurerm'
-        command: 'custom'
-        customCommand: 'fmt'
-        commandOptions: '-check -recursive -diff'
-        workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
   # ── validate ───────────────────────────────────────────────────────────────
   - job: TfValidate
@@ -114,23 +108,14 @@ stages:
       inputs:
         terraformVersion: '$(TF_VERSION)'
 
-    # Init sans backend : télécharge les providers sans accéder au Storage Account
-    # commandOptions '-backend=false' court-circuite la configuration du state
-    - task: TerraformTaskV4@4
+    # init/validate sont purement locaux — pas de credentials Azure requis
+    - script: terraform init -backend=false -input=false
       displayName: 'terraform init -backend=false'
-      inputs:
-        provider: 'azurerm'
-        command: 'init'
-        commandOptions: '-backend=false -input=false'
-        workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-    # Vérifie la syntaxe et la cohérence des modules (références, types, variables)
-    - task: TerraformTaskV4@4
+    - script: terraform validate
       displayName: 'terraform validate'
-      inputs:
-        provider: 'azurerm'
-        command: 'validate'
-        workingDirectory: '$(System.DefaultWorkingDirectory)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
 
 
 # =============================================================================
