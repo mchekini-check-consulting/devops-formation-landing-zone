@@ -243,11 +243,12 @@ stages:
 
     - bash: |
         set -e
+        REPO_SLUG=$(echo "$(Build.Repository.Uri)" | sed 's|.*github\.com/||')
         infracost comment github \
           --path /tmp/infracost-diff.json \
           --github-token "$(GITHUB_TOKEN)" \
           --pull-request "$(System.PullRequest.PullRequestNumber)" \
-          --repo-url "$(Build.Repository.Uri)" \
+          --repo "$REPO_SLUG" \
           --behavior update
       displayName: 'Commenter Infracost sur la PR'
       env:
