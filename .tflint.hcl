@@ -14,12 +14,9 @@ plugin "azurerm" {
 
 # ── Configuration globale ────────────────────────────────────────────────────
 config {
-  # false : n'analyse que le répertoire courant (les sous-modules sont appelés
+  # none : n'analyse que le répertoire courant (les sous-modules sont appelés
   # via --recursive dans la pipeline, pas via ce flag)
   call_module_type = "none"
-
-  # Désactive l'évaluation des expressions (plus rapide, suffisant en CI)
-  eval_mode = "lazy"
 }
 
 # =============================================================================
