@@ -17,7 +17,7 @@
 #  - Variable Group "infracost-secrets"  → INFRACOST_API_KEY  (secret)
 #  - Service Connection                  → sp-landing-zone-sub  (Azure RM)
 #  - Environment "prod"                  → avec Approval check configurée
-#  - "Allow scripts to access OAuth token" activé sur le pipeline
+#  - "Allow scripts to access OAuth token" activéa sur le pipeline
 # =============================================================================
 
 trigger:
