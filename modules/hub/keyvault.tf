@@ -72,6 +72,12 @@ resource "azurerm_key_vault" "main" {
     certificate_permissions = local.terraform_certificate_permissions
   }
 
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = data.azurerm_client_config.current.object_id
+    secret_permissions = local.terraform_secret_permissions
+  }
+
   tags = merge(local.common_tags, {
     Function = "security"
   })
