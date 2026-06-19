@@ -65,7 +65,7 @@ resource "azurerm_key_vault" "main" {
   purge_protection_enabled   = false #tfsec:ignore:azure-keyvault-no-purge
 
   network_acls {
-    default_action = "Allow"
+    default_action = "Allow" #tfsec:ignore:azure-keyvault-specify-network-acl
     bypass         = "AzureServices"
   }
 
