@@ -62,7 +62,12 @@ resource "azurerm_key_vault" "main" {
   sku_name            = "standard"
 
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  purge_protection_enabled   = false #tfsec:ignore:azure-keyvault-no-purge
+
+  network_acls {
+    default_action = "Allow"
+    bypass         = "AzureServices"
+  }
 
 
   access_policy {

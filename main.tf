@@ -23,11 +23,12 @@ module "hub" {
 
 
 module "aks" {
-  source       = "./modules/aks"
-  team_name    = var.team_name
-  project_name = "ecom"
-  location     = var.location
-  acr_id       = module.hub.acr_id
+  source                     = "./modules/aks"
+  team_name                  = var.team_name
+  project_name               = "ecom"
+  location                   = var.location
+  acr_id                     = module.hub.acr_id
+  log_analytics_workspace_id = module.hub.log_analytics_workspace_id
 }
 
 module "velero" {

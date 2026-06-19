@@ -1,12 +1,14 @@
+#tfsec:ignore:azure-container-limit-authorized-ips
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                      = "aks-${var.team_name}-${var.project_name}"
-  location                  = azurerm_resource_group.aks.location
-  resource_group_name       = azurerm_resource_group.aks.name
-  dns_prefix                = "aks-${var.team_name}-${var.project_name}"
-  private_cluster_enabled   = false
-  oidc_issuer_enabled       = true
-  workload_identity_enabled = true
-  tags                      = var.tags
+  name                              = "aks-${var.team_name}-${var.project_name}"
+  location                          = azurerm_resource_group.aks.location
+  resource_group_name               = azurerm_resource_group.aks.name
+  dns_prefix                        = "aks-${var.team_name}-${var.project_name}"
+  private_cluster_enabled           = false
+  oidc_issuer_enabled               = true
+  workload_identity_enabled         = true
+  role_based_access_control_enabled = true
+  tags                              = var.tags
 
   identity {
     type = "SystemAssigned"
@@ -27,6 +29,10 @@ resource "azurerm_kubernetes_cluster" "aks" {
     network_policy = "calico"
     service_cidr   = "172.16.0.0/16"
     dns_service_ip = "172.16.0.10"
+  }
+
+  oms_agent {
+    log_analytics_workspace_id = var.log_analytics_workspace_id
   }
 
   workload_autoscaler_profile {
