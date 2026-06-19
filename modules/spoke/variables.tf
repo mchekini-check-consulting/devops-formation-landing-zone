@@ -11,7 +11,7 @@ variable "location" {
 }
 
 variable "environments" {
-  type = list(string)
+  type    = list(string)
   default = ["dev", "qua", "prod"]
 }
 
@@ -32,7 +32,7 @@ variable "hub_resource_group_name" {
 }
 
 variable "tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 

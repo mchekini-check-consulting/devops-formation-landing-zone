@@ -1,25 +1,25 @@
 resource "azurerm_kubernetes_cluster" "aks" {
-  name                    = "aks-${var.team_name}-${var.project_name}"
-  location                = azurerm_resource_group.aks.location
-  resource_group_name     = azurerm_resource_group.aks.name
-  dns_prefix              = "aks-${var.team_name}-${var.project_name}"
-  private_cluster_enabled = false
+  name                      = "aks-${var.team_name}-${var.project_name}"
+  location                  = azurerm_resource_group.aks.location
+  resource_group_name       = azurerm_resource_group.aks.name
+  dns_prefix                = "aks-${var.team_name}-${var.project_name}"
+  private_cluster_enabled   = false
   oidc_issuer_enabled       = true
   workload_identity_enabled = true
-  tags                    = var.tags
+  tags                      = var.tags
 
   identity {
     type = "SystemAssigned"
   }
 
   default_node_pool {
-    name                        = "system"
-    node_count                  = 1
-    vm_size                     = var.system_vm_size
-    vnet_subnet_id              = azurerm_subnet.aks.id
+    name                         = "system"
+    node_count                   = 1
+    vm_size                      = var.system_vm_size
+    vnet_subnet_id               = azurerm_subnet.aks.id
     only_critical_addons_enabled = true
-    temporary_name_for_rotation = "systemtmp"
-    zones                       = ["1"]
+    temporary_name_for_rotation  = "systemtmp"
+    zones                        = ["1"]
   }
 
   network_profile {

@@ -1,0 +1,32 @@
+# =============================================================================
+# infracost.yml — Configuration Infracost
+# Documentation : https://www.infracost.io/docs/features/config_file/
+#
+# Ce fichier est lu automatiquement par la commande `infracost breakdown`
+# quand il est présent à la racine du projet.
+# =============================================================================
+version: 0.1
+
+projects:
+  - path: .
+    name: devops-formation-landing-zone
+
+    # ── Variables Terraform passées à infracost ───────────────────────────
+    # Infracost les utilise pour calculer les coûts de certaines ressources
+    # (ex: nombre de noeuds AKS, SKU de VM, etc.)
+    # Ces valeurs sont lues depuis le terraform.tfvars existant par défaut,
+    # mais on peut les surcharger ici pour le calcul de coût en CI.
+    terraform_var_files:
+      - terraform.tfvars
+
+    # ── Exclusion de ressources sans impact coût ──────────────────────────
+    # Les ressources listées ici apparaissent dans le plan mais coûtent $0
+    # (ex: azurerm_resource_group, azurerm_role_assignment, etc.)
+    # Infracost les ignore automatiquement — pas besoin de les exclure manuellement
+
+    # ── Variables d'environnement Terraform (optionnel) ───────────────────
+    # Si certaines variables Terraform sont lues depuis des env vars en CI,
+    # les déclarer ici pour qu'infracost puisse les résoudre
+    # env:
+    #   TF_VAR_location: "francecentral"
+    #   TF_VAR_team_name: "necom"
