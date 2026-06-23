@@ -11,9 +11,9 @@ locals {
   # Calcul des subnets pour chaque environnement
   subnets = {
     for env in var.environments : env => {
-      front = cidrsubnet(var.address_spaces[env], 8, 0)  # x.x.0.0/24
-      back  = cidrsubnet(var.address_spaces[env], 8, 1)  # x.x.1.0/24
-      data  = cidrsubnet(var.address_spaces[env], 8, 2)  # x.x.2.0/24
+      front = cidrsubnet(var.address_spaces[env], 8, 0) # x.x.0.0/24
+      back  = cidrsubnet(var.address_spaces[env], 8, 1) # x.x.1.0/24
+      data  = cidrsubnet(var.address_spaces[env], 8, 2) # x.x.2.0/24
     }
   }
 }

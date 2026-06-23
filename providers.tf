@@ -1,4 +1,6 @@
 terraform {
+  required_version = ">= 1.7"
+
   required_providers {
     azurerm = {
       source  = "hashicorp/azurerm"
@@ -8,14 +10,18 @@ terraform {
       source  = "hashicorp/helm"
       version = "~> 2.0"
     }
-}
+    azuread = {
+      source  = "hashicorp/azuread"
+      version = "~> 3.0"
+    }
+  }
 
 
   backend "azurerm" {
-    resource_group_name = "rg-tfstate"
+    resource_group_name  = "rg-tfstate"
     storage_account_name = "sanecomformation"
-    container_name = "ecom-formation-tfstate"
-    key = "terraform.tfstate"
+    container_name       = "ecom-formation-tfstate"
+    key                  = "terraform.tfstate"
   }
 
 }
@@ -24,6 +30,8 @@ provider "azurerm" {
   features {}
   resource_provider_registrations = "none"
 }
+
+provider "azuread" {}
 
 provider "helm" {
   kubernetes {

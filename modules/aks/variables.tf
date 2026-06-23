@@ -67,6 +67,11 @@ variable "acr_id" {
   type        = string
 }
 
+variable "log_analytics_workspace_id" {
+  description = "ID du Log Analytics Workspace pour l'OMS agent AKS"
+  type        = string
+}
+
 variable "tags" {
   description = "Tags a appliquer aux ressources"
   type        = map(string)

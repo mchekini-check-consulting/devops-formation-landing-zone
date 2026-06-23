@@ -47,3 +47,22 @@ output "sonarqube_admin_secret_name" {
   value       = module.platform.sonarqube_admin_secret_name
 }
 
+#--------------------------------------------------------------
+# CI/CD Identity Outputs
+#--------------------------------------------------------------
+
+output "cicd_client_id" {
+  description = "Client ID du Service Principal CI/CD (AZURE_CLIENT_ID)"
+  value       = module.cicd_identity.client_id
+}
+
+output "cicd_tenant_id" {
+  description = "Tenant ID Azure AD (AZURE_TENANT_ID)"
+  value       = module.cicd_identity.tenant_id
+}
+
+output "cicd_subscription_id" {
+  description = "Subscription ID Azure (AZURE_SUBSCRIPTION_ID)"
+  value       = module.cicd_identity.subscription_id
+}
+

@@ -7,12 +7,12 @@ variable "location" {
 }
 
 variable "address_space" {
-  type = string
+  type    = string
   default = "10.0.0.0/16"
 }
 
 variable "tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 
@@ -30,16 +30,6 @@ variable "ssh_private_key_secret_name" {
 
 variable "readers_group_object_id" {
   type = string
-}
-
-variable "keycloak_vm_size" {
-  description = "Gabarit de la VM keycloak"
-  type        = string
-}
-
-variable "keycloak_vm_admin_username" {
-  description = "Utilisateur administrateur des VMs linux"
-  type        = string
 }
 
 variable "apim_publisher_email" {
@@ -67,8 +57,8 @@ variable "payment_lb_ip" {
 
 variable "fraud_check_function_urls" {
   description = "value"
-  type = map(string)
-  default = {}
+  type        = map(string)
+  default     = {}
 }
 
 variable "catalog_rate_limit" {

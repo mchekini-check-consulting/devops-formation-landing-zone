@@ -10,7 +10,7 @@ resource "null_resource" "generate_ssh_key_in_vault" {
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
-    command = <<-EOT
+    command     = <<-EOT
       set -euo pipefail
 
       VAULT_NAME="${azurerm_key_vault.main.name}"
@@ -62,7 +62,12 @@ resource "azurerm_key_vault" "main" {
   sku_name            = "standard"
 
   soft_delete_retention_days = 7
-  purge_protection_enabled   = false
+  purge_protection_enabled   = false #tfsec:ignore:azure-keyvault-no-purge
+
+  network_acls {
+    default_action = "Allow" #tfsec:ignore:azure-keyvault-specify-network-acl
+    bypass         = "AzureServices"
+  }
 
 
   access_policy {
@@ -70,6 +75,12 @@ resource "azurerm_key_vault" "main" {
     object_id               = var.readers_group_object_id
     secret_permissions      = local.terraform_secret_permissions
     certificate_permissions = local.terraform_certificate_permissions
+  }
+
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = data.azurerm_client_config.current.object_id
+    secret_permissions = local.terraform_secret_permissions
   }
 
   tags = merge(local.common_tags, {
