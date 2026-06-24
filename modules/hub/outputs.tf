@@ -29,22 +29,6 @@ output "key_vault_name" {
   value = azurerm_key_vault.main.name
 }
 
-output "log_analytics_workspace_id" {
-  description = "ID du Log Analytics Workspace centralisé pour tous les environnements"
-  value       = azurerm_log_analytics_workspace.main.id
-}
-
-output "application_insights_instrumentation_key" {
-  description = "Clé d'instrumentation Application Insights pour l'envoi de télémétrie"
-  value       = azurerm_application_insights.main.instrumentation_key
-  sensitive   = true
-}
-
-output "application_insights_connection_string" {
-  description = "Connection string Application Insights (méthode recommandée pour les SDK récents)"
-  value       = azurerm_application_insights.main.connection_string
-  sensitive   = true
-}
 
 output "devops_resource_group_name" {
   description = "Nom du resource group hub devops (ACR, Managed Identities DevOps)"
