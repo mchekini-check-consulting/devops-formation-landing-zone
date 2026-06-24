@@ -1,0 +1,29 @@
+# =============================================================================
+# StorageClass — Azure Disk Standard SSD LRS
+# =============================================================================
+# Comportement attendu :
+#   - Chaque pod du StatefulSet reçoit un PVC de 20Gi indépendant
+#   - Le PV est créé dans la même zone Azure que le pod (WaitForFirstConsumer)
+#   - Si le PVC est supprimé, le disque Azure est conservé (Retain)
+#     → les données survivent à une suppression accidentelle du PVC
+#   - Le disque peut être agrandi sans recréer le PVC (allowVolumeExpansion)
+#
+# Vérification :
+#   kubectl get storageclass postgres-standard-ssd
+#   kubectl get pvc -n dev -l app=postgres
+# =============================================================================
+
+apiVersion: storage.k8s.io/v1
+kind: StorageClass
+metadata:
+  name: postgres-standard-ssd
+provisioner: disk.csi.azure.com
+parameters:
+  # Standard SSD LRS : moins cher que Premium, plus fiable que HDD
+  # Valeurs possibles : Standard_LRS | StandardSSD_LRS | Premium_LRS | UltraSSD_LRS
+  skuName: StandardSSD_LRS
+# PV créé uniquement quand le pod est schedulé → même zone Azure que le pod
+volumeBindingMode: WaitForFirstConsumer
+# Disque Azure conservé si PVC supprimé → protection des données
+reclaimPolicy: Retain
+allowVolumeExpansion: true
