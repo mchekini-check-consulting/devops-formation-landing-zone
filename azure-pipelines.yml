@@ -55,7 +55,7 @@ variables:
     value: '1.28.6'
 
   - name: azureServiceConnection
-    value: 'sc-formation-devops-sub'
+    value: 'sc-formation-devops-sub1'
 
   - name: TF_IN_AUTOMATION
     value: 'true'
