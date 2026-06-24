@@ -1,33 +1,17 @@
 # =============================================================================
-# azure-pipelines.yml — CI/CD Landing Zone Azure Terraform
+# azure-pipelines-pr.yml — Pipeline PR (validate + security + infracost + plan)
+# Déclenché uniquement sur les Pull Requests ciblant main
 # =============================================================================
 #
-# EXTENSIONS MARKETPLACE À INSTALLER (une seule fois par organisation)
-# ─────────────────────────────────────────────────────────────────────
-#  1. Terraform (ms-devlabs)  → marketplace.visualstudio.com/items?itemName=ms-devlabs.custom-terraform-tasks
-#     Fournit : TerraformInstaller@1  et  TerraformTaskV4@4
-#
-#  2. Checkov (Bridgecrew)    → marketplace.visualstudio.com/items?itemName=Bridgecrew.checkov
-#     Fournit : Checkov@1
-#
-# PRÉ-REQUIS AZURE DEVOPS
+# PRÉ-REQUIS
 # ─────────────────────────────────────────────────────────────────────
 #  - Variable Group "terraform-backend"  → TF_BACKEND_RG, TF_BACKEND_SA,
 #                                          TF_BACKEND_CONTAINER, TF_BACKEND_KEY
-#  - Variable Group "infracost-secrets"  → INFRACOST_API_KEY  (secret)
-#  - Service Connection                  → sp-landing-zone-sub  (Azure RM)
-#  - Environment "prod"                  → avec Approval check configurée
-#  - "Allow scripts to access OAuth token" activéa sur le pipeline
+#  - Variable Group "infracost-secrets"  → INFRACOST_API_KEY, GITHUB_TOKEN
+#  - Service Connection                  → sc-formation-devops-sub1
 # =============================================================================
 
-trigger:
-  branches:
-    include:
-      - main
-  paths:
-    exclude:
-      - '**.md'
-      - 'docs/**'
+trigger: none
 
 pr:
   branches:
@@ -38,9 +22,6 @@ pr:
       - '**.md'
       - 'docs/**'
 
-# =============================================================================
-# VARIABLES hhhh
-# =============================================================================
 variables:
   - group: terraform-backend
   - group: infracost-secrets
@@ -73,7 +54,6 @@ stages:
   displayName: 'Validate — fmt + validate'
   jobs:
 
-  # ── fmt check ──────────────────────────────────────────────────────────────
   - job: FmtCheck
     displayName: 'terraform fmt -check'
     pool:
@@ -82,18 +62,15 @@ stages:
 
     - checkout: self
 
-    # Installe la version exacte de Terraform (extension ms-devlabs)
     - task: TerraformInstaller@1
       displayName: 'Installer Terraform $(TF_VERSION)'
       inputs:
         terraformVersion: '$(TF_VERSION)'
 
-    # fmt est purement local — pas de credentials Azure requis
     - script: terraform fmt -check -recursive -diff
       displayName: 'terraform fmt -check -recursive'
       workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-  # ── validate ───────────────────────────────────────────────────────────────
   - job: TfValidate
     displayName: 'terraform validate'
     dependsOn: FmtCheck
@@ -108,7 +85,6 @@ stages:
       inputs:
         terraformVersion: '$(TF_VERSION)'
 
-    # init/validate sont purement locaux — pas de credentials Azure requis
     - script: terraform init -backend=false -input=false
       displayName: 'terraform init -backend=false'
       workingDirectory: '$(System.DefaultWorkingDirectory)'
@@ -127,8 +103,6 @@ stages:
   condition: succeeded()
   jobs:
 
-  # ── TFLint ─────────────────────────────────────────────────────────────────
-  # Pas de task marketplace fiable — installation via script officiel
   - job: TFLint
     displayName: 'tflint (plugin azurerm)'
     pool:
@@ -149,7 +123,6 @@ stages:
       displayName: 'tflint --recursive'
       workingDirectory: '$(System.DefaultWorkingDirectory)'
 
-  # ── TFSec ──────────────────────────────────────────────────────────────────
   - job: TFSec
     displayName: 'tfsec'
     pool:
@@ -168,8 +141,6 @@ stages:
       workingDirectory: '$(System.DefaultWorkingDirectory)'
       continueOnError: true
 
-  # ── Checkov ────────────────────────────────────────────────────────────────
-  # Utilise la task officielle Bridgecrew (extension : Bridgecrew.checkov)
   - job: Checkov
     displayName: 'checkov'
     pool:
@@ -178,9 +149,6 @@ stages:
 
     - checkout: self
 
-    # Task marketplace Bridgecrew — remplace le pip install + script
-    # softFail: true → affiche les résultats sans bloquer le pipeline
-    # Passer softFail à false quand le baseline sécurité est stabilisé
     - script: |
         pip install checkov --quiet
         checkov -d . --framework terraform --compact --soft-fail
@@ -188,16 +156,12 @@ stages:
 
 
 # =============================================================================
-# STAGE 3 — INFRACOST  (PR uniquement)
+# STAGE 3 — INFRACOST
 # =============================================================================
 - stage: Infracost
-  displayName: 'Infracost — diff coût (PR only)'
+  displayName: 'Infracost — diff coût'
   dependsOn: Security
-  condition: |
-    and(
-      succeeded(),
-      eq(variables['Build.Reason'], 'PullRequest')
-    )
+  condition: succeeded()
   jobs:
 
   - job: InfracostDiff
@@ -278,8 +242,6 @@ stages:
       inputs:
         terraformVersion: '$(TF_VERSION)'
 
-    # TerraformTaskV4 init : la Service Connection gère l'auth du backend
-    # Les inputs backendAzureRm* remplacent les -backend-config dans le script précédent
     - task: TerraformTaskV4@4
       displayName: 'terraform init'
       inputs:
@@ -307,8 +269,6 @@ stages:
             --auth-mode login \
             && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
 
-    # Kubeconfig nécessaire pour le provider Helm (module platform)
-    # Seul endroit où AzureCLI@2 reste — pas de task marketplace pour az aks get-credentials
     - task: AzureCLI@2
       displayName: 'Configurer kubeconfig AKS (provider Helm)'
       inputs:
@@ -325,8 +285,6 @@ stages:
             echo "⚠ Aucun cluster AKS trouvé"
           fi
 
-    # TerraformTaskV4 plan : environmentServiceNameAzureRM gère l'auth du provider azurerm
-    # Remplace complètement le AzureCLI@2 + export ARM_* précédent
     - task: TerraformTaskV4@4
       displayName: 'terraform plan'
       inputs:
@@ -336,7 +294,6 @@ stages:
         environmentServiceNameAzureRM: '$(azureServiceConnection)'
         commandOptions: '-input=false -out=tfplan.binary'
 
-    # Commentaire PR — API GitHub (repo hébergé sur GitHub)
     - bash: |
         set -e
         PR_NUMBER="$(System.PullRequest.PullRequestNumber)"
@@ -355,9 +312,7 @@ stages:
         ${PLAN_CONTENT}
         \`\`\`
 
-        </details>
-
-        > Apply déclenché après merge sur \`main\` + approbation manuelle dans l'Environment **prod**." \
+        </details>" \
           '{body: $c}')
         HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
           -X POST \
@@ -370,95 +325,3 @@ stages:
       workingDirectory: '$(System.DefaultWorkingDirectory)'
       env:
         GITHUB_TOKEN: $(GITHUB_TOKEN)
-      condition: and(succeeded(), eq(variables['Build.Reason'], 'PullRequest'))
-
-    - publish: '$(System.DefaultWorkingDirectory)/tfplan.binary'
-      artifact: 'terraform-plan'
-      displayName: 'Publier artifact tfplan.binary'
-
-
-# =============================================================================
-# STAGE 5 — APPLY  (main uniquement + gate manuelle via Environment prod)
-# =============================================================================
-- stage: Apply
-  displayName: 'Terraform Apply — prod (gate manuelle)'
-  dependsOn: Plan
-  condition: |
-    and(
-      succeeded(),
-      eq(variables['Build.SourceBranch'], 'refs/heads/main'),
-      ne(variables['Build.Reason'], 'PullRequest')
-    )
-  jobs:
-
-  - deployment: TerraformApply
-    displayName: 'terraform apply'
-    pool:
-      vmImage: 'ubuntu-latest'
-    environment: 'prod'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-
-          - checkout: self
-
-          - task: TerraformInstaller@1
-            displayName: 'Installer Terraform $(TF_VERSION)'
-            inputs:
-              terraformVersion: '$(TF_VERSION)'
-
-          - download: current
-            artifact: 'terraform-plan'
-            displayName: 'Télécharger tfplan.binary'
-
-          - task: TerraformTaskV4@4
-            displayName: 'terraform init'
-            inputs:
-              provider: 'azurerm'
-              command: 'init'
-              workingDirectory: '$(System.DefaultWorkingDirectory)'
-              backendServiceArm: '$(azureServiceConnection)'
-              backendAzureRmResourceGroupName: '$(TF_BACKEND_RG)'
-              backendAzureRmStorageAccountName: '$(TF_BACKEND_SA)'
-              backendAzureRmContainerName: '$(TF_BACKEND_CONTAINER)'
-              backendAzureRmKey: '$(TF_BACKEND_KEY)'
-              commandOptions: '-input=false'
-
-          - task: AzureCLI@2
-            displayName: 'Libérer le verrou state (si existant)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                az storage blob lease break \
-                  --blob-name "$(TF_BACKEND_KEY)" \
-                  --container-name "$(TF_BACKEND_CONTAINER)" \
-                  --account-name "$(TF_BACKEND_SA)" \
-                  --auth-mode login \
-                  && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
-
-          - task: AzureCLI@2
-            displayName: 'Configurer kubeconfig AKS (provider Helm)'
-            inputs:
-              azureSubscription: '$(azureServiceConnection)'
-              scriptType: 'bash'
-              scriptLocation: 'inlineScript'
-              inlineScript: |
-                AKS_RG=$(az aks list --query "[0].resourceGroup" -o tsv 2>/dev/null || true)
-                AKS_NAME=$(az aks list --query "[0].name" -o tsv 2>/dev/null || true)
-                if [ -n "$AKS_RG" ] && [ -n "$AKS_NAME" ]; then
-                  az aks get-credentials --resource-group "$AKS_RG" --name "$AKS_NAME" --overwrite-existing
-                fi
-
-          # TerraformTaskV4 apply : applique le plan binaire téléchargé depuis l'artifact
-          # -auto-approve car l'approbation humaine a eu lieu via la gate Environment prod
-          - task: TerraformTaskV4@4
-            displayName: 'terraform apply'
-            inputs:
-              provider: 'azurerm'
-              command: 'apply'
-              workingDirectory: '$(System.DefaultWorkingDirectory)'
-              environmentServiceNameAzureRM: '$(azureServiceConnection)'
-              commandOptions: '-auto-approve $(Pipeline.Workspace)/terraform-plan/tfplan.binary'
