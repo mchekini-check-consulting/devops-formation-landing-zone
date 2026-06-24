@@ -293,6 +293,20 @@ stages:
         backendAzureRmKey: '$(TF_BACKEND_KEY)'
         commandOptions: '-input=false'
 
+    - task: AzureCLI@2
+      displayName: 'Libérer le verrou state (si existant)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az storage blob lease break \
+            --blob-name "$(TF_BACKEND_KEY)" \
+            --container-name "$(TF_BACKEND_CONTAINER)" \
+            --account-name "$(TF_BACKEND_SA)" \
+            --auth-mode login \
+            && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
+
     # Kubeconfig nécessaire pour le provider Helm (module platform)
     # Seul endroit où AzureCLI@2 reste — pas de task marketplace pour az aks get-credentials
     - task: AzureCLI@2
@@ -405,6 +419,20 @@ stages:
               backendAzureRmContainerName: '$(TF_BACKEND_CONTAINER)'
               backendAzureRmKey: '$(TF_BACKEND_KEY)'
               commandOptions: '-input=false'
+
+          - task: AzureCLI@2
+            displayName: 'Libérer le verrou state (si existant)'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob lease break \
+                  --blob-name "$(TF_BACKEND_KEY)" \
+                  --container-name "$(TF_BACKEND_CONTAINER)" \
+                  --account-name "$(TF_BACKEND_SA)" \
+                  --auth-mode login \
+                  && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
 
           - task: AzureCLI@2
             displayName: 'Configurer kubeconfig AKS (provider Helm)'
