@@ -5,12 +5,6 @@ locals {
 }
 
 
-resource "azurerm_resource_group" "monitoring" {
-  location = var.location
-  name     = "rg-${var.team_name}-monitoring"
-  tags     = merge(local.common_tags, { Function = "monitoring" })
-}
-
 resource "azurerm_resource_group" "network" {
   location = var.location
   name     = "rg-${var.team_name}-network"
