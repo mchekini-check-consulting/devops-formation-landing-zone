@@ -59,64 +59,6 @@ variable "apim_publisher_email" {
 }
 
 
-variable "keycloak_vm_size" {
-  description = "Gabarit de la VM keycloak"
-  type        = string
-  default     = "Standard_B2s"
-}
-
-variable "keycloak_vm_admin_username" {
-  description = "Utilisateur administrateur des VMs linux"
-  type        = string
-  default     = "azureuser"
-}
-
-
-variable "fraud_amount_limit" {
-  description = "Montant maximum autorisé par paiement (en euros). Tout montant supérieur est bloqué."
-  type        = number
-  default     = 5000
-
-  validation {
-    condition     = var.fraud_amount_limit > 0
-    error_message = "fraud_amount_limit doit être strictement positif."
-  }
-}
-
-variable "fraud_velocity_max_calls" {
-  description = "Nombre maximum de paiements autorisés par utilisateur sur la fenêtre de temps."
-  type        = number
-  default     = 5
-
-  validation {
-    condition     = var.fraud_velocity_max_calls >= 1
-    error_message = "fraud_velocity_max_calls doit être >= 1."
-  }
-}
-
-variable "fraud_velocity_window_seconds" {
-  description = "Fenêtre de temps (en secondes) pour la règle de vélocité. Défaut : 600 s (10 min)."
-  type        = number
-  default     = 600
-
-  validation {
-    condition     = var.fraud_velocity_window_seconds > 0
-    error_message = "fraud_velocity_window_seconds doit être strictement positif."
-  }
-}
-
-variable "fraud_blacklisted_ips" {
-  description = "Liste des IPs blacklistées. Transmise à la Function App via app_settings."
-  type        = list(string)
-  default     = []
-}
-
-variable "apim_allowed_origins" {
-  description = "Liste des origines CORS autorisées sur la Function App (typiquement l'URL de l'APIM)."
-  type        = list(string)
-  default     = ["*"]
-}
-
 variable "catalog_rate_limit" {
   description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice catalog."
   type        = number

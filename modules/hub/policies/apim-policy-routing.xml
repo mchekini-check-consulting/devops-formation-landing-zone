@@ -24,38 +24,6 @@
         </return-response>
       </when>
     </choose>
-    <!-- Validation JWT uniquement pour les routes API -->
-    <choose>
-      <when condition="@(context.Request.Url.Path.Contains("api/"))">
-        <validate-jwt header-name="Authorization" failed-validation-httpcode="401" require-expiration-time="true" require-signed-tokens="true">
-          <openid-config url="https://ecom-apim-formation.azure-api.net/keycloak/realms/user/.well-known/openid-configuration" />
-          <audiences>
-            <audience>account</audience>
-          </audiences>
-        </validate-jwt>
-        <set-header name="X-User-ID" exists-action="override">
-          <value>@(context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt()?.Subject)</value>
-        </set-header>
-      </when>
-    </choose>
-    <!-- RBAC : écriture catalog réservée aux administrateurs -->
-    <choose>
-      <when condition="@((context.Request.Method == "POST" || context.Request.Method == "DELETE") && context.Request.Url.Path.Contains("api/products") && !context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt().Claims.GetValueOrDefault("realm_access","").Contains("admin"))">
-        <return-response>
-          <set-status code="403" reason="Forbidden" />
-          <set-header name="Content-Type" exists-action="override">
-            <value>application/json</value>
-          </set-header>
-          <set-header name="Access-Control-Allow-Origin" exists-action="override">
-            <value>https://${frontend_public_ip}</value>
-          </set-header>
-          <set-header name="Access-Control-Allow-Credentials" exists-action="override">
-            <value>true</value>
-          </set-header>
-          <set-body>{"error": "forbidden", "message": "Accès réservé aux administrateurs"}</set-body>
-        </return-response>
-      </when>
-    </choose>
     <!-- Rate limiting par microservice (après extraction JWT) -->
     <choose>
       <when condition="@(context.Request.Url.Path.Contains("api/products"))">
@@ -70,14 +38,6 @@
     </choose>
     <!-- Routage -->
     <choose>
-      <when condition="@(context.Request.Url.Path.StartsWith("auth"))">
-        <set-backend-service backend-id="keycloak-backend" />
-        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(4))" copy-unmatched-params="true" />
-      </when>
-      <when condition="@(context.Request.Url.Path.StartsWith("keycloak"))">
-        <set-backend-service backend-id="keycloak-backend" />
-        <rewrite-uri template="@(context.Request.Url.Path.ToString().Substring(9))" copy-unmatched-params="true" />
-      </when>
       <when condition="@(context.Request.Url.Path.Contains("api/products"))">
         <set-backend-service base-url="http://${backend_vm_ip}:4000" />
       </when>

@@ -5,6 +5,7 @@ resource "azurerm_storage_account" "velero" {
   account_tier             = "Standard"
   account_replication_type = "LRS"
   access_tier              = "Cool"
+  min_tls_version          = "TLS1_2"
 
   blob_properties {
     delete_retention_policy {

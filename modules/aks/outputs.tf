@@ -18,3 +18,8 @@ output "resource_group_name" {
   description = "Nom du resource group AKS"
   value       = azurerm_resource_group.aks.name
 }
+
+output "aks_id" {
+  description = "ID du cluster AKS"
+  value       = azurerm_kubernetes_cluster.aks.id
+}
