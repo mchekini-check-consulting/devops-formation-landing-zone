@@ -10,7 +10,7 @@ resource "null_resource" "generate_ssh_key_in_vault" {
 
   provisioner "local-exec" {
     interpreter = ["/bin/bash", "-c"]
-    command = <<-EOT
+    command     = <<-EOT
       set -euo pipefail
 
       VAULT_NAME="${azurerm_key_vault.main.name}"
@@ -70,6 +70,28 @@ resource "azurerm_key_vault" "main" {
     object_id               = var.readers_group_object_id
     secret_permissions      = local.terraform_secret_permissions
     certificate_permissions = local.terraform_certificate_permissions
+  }
+
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = var.cicd_sp_object_id
+    secret_permissions = ["Get", "List"]
+  }
+
+  access_policy {
+    tenant_id          = data.azurerm_client_config.current.tenant_id
+    object_id          = var.terraform_runner_object_id
+    secret_permissions = ["Get", "Set", "List", "Delete", "Recover", "Purge"]
+  }
+
+  access_policy {
+    tenant_id = data.azurerm_client_config.current.tenant_id
+    object_id = var.devops_sp_object_id
+    key_permissions = [
+      "Get", "List", "Update", "Delete", "Recover",
+      "Backup", "Restore", "Import", "Create",
+    ]
+    secret_permissions = ["Get", "List", "Set", "Delete", "Recover", "Backup", "Restore"]
   }
 
   tags = merge(local.common_tags, {

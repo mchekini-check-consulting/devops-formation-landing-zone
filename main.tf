@@ -4,24 +4,13 @@ module "hub" {
   location      = var.location
   address_space = var.hub_address_space
 
-  key_vault_name             = var.key_vault_name
-  ssh_public_key_secret_name = var.ssh_public_key_secret_name
+  key_vault_name              = var.key_vault_name
+  ssh_public_key_secret_name  = var.ssh_public_key_secret_name
   ssh_private_key_secret_name = var.ssh_private_key_secret_name
-  readers_group_object_id = var.readers_group_object_id
-  apim_publisher_email = var.apim_publisher_email
-  keycloak_vm_admin_username = var.keycloak_vm_admin_username
-  keycloak_vm_size = var.keycloak_vm_size
-
-  frontend_public_ip = "20.43.59.226"
-  backend_vm_ip      = "10.1.1.4"
-  payment_lb_ip      = "10.1.1.10"
-
-  fraud_check_function_urls = module.spoke.fraud_check_function_urls
-
-  catalog_rate_limit = var.catalog_rate_limit
-  order_rate_limit   = var.order_rate_limit
-  payment_rate_limit = var.payment_rate_limit
-
+  readers_group_object_id     = var.readers_group_object_id
+  cicd_sp_object_id           = var.cicd_sp_object_id
+  terraform_runner_object_id  = var.terraform_runner_object_id
+  devops_sp_object_id         = var.devops_sp_object_id
 }
 
 
@@ -41,29 +30,15 @@ module "velero" {
   aks_oidc_issuer_url = module.aks.oidc_issuer_url
 
   tags = {
-    managed_by  = "terraform"
-    team        = var.team_name
-    component   = "backup"
-  }
-}
-
-module "velero" {
-  source              = "./modules/velero"
-  team_name           = var.team_name
-  location            = var.location
-  resource_group_name = module.aks.resource_group_name
-  aks_oidc_issuer_url = module.aks.oidc_issuer_url
-
-  tags = {
-    managed_by  = "terraform"
-    team        = var.team_name
-    component   = "backup"
+    managed_by = "terraform"
+    team       = var.team_name
+    component  = "backup"
   }
 }
 
 module "platform" {
-  source       = "./modules/platform"
-  team_name    = var.team_name
+  source          = "./modules/platform"
+  team_name       = var.team_name
   project_name    = "ecom"
   location        = var.location
   oidc_issuer_url = module.aks.oidc_issuer_url
@@ -77,20 +52,32 @@ module "platform" {
   key_vault_id = module.hub.key_vault_id
 }
 
+module "cicd_identity" {
+  source = "./modules/cicd-identity"
 
-module "spoke" {
+  team_name  = var.team_name
+  github_org = "mchekini-check-consulting"
+  github_repositories = [
+    "devops-formation-catalog",
+    "devops-formation-order",
+    "devops-formation-payment",
+    "devops-formation-landing-zone",
+    "devops-formation-utils",
+  ]
 
-  source = "./modules/spoke"
-  team_name = var.team_name
-  project_name = "ecom"
-  address_spaces = var.spoke_address_spaces
-  hub_vnet_id = module.hub.vnet_hub_id
-  hub_vnet_name = module.hub.vnet_hub_name
-  hub_resource_group_name = module.hub.resource_group_name
-  location = var.location
-  environments = var.environments
-
-  apim_subnet_id  = module.hub.apim_subnet_id
-  apim_public_ip  = module.hub.apim_public_ip
+  acr_id            = module.hub.acr_id
+  aks_id            = module.aks.aks_id
+  resource_group_id = module.hub.devops_resource_group_id
 }
 
+module "spoke" {
+  source                  = "./modules/spoke"
+  team_name               = var.team_name
+  project_name            = "ecom"
+  address_spaces          = var.spoke_address_spaces
+  hub_vnet_id             = module.hub.vnet_hub_id
+  hub_vnet_name           = module.hub.vnet_hub_name
+  hub_resource_group_name = module.hub.resource_group_name
+  location                = var.location
+  environments            = var.environments
+}

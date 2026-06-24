@@ -1,0 +1,197 @@
+# =============================================================================
+# azure-pipelines-apply.yml — Pipeline Apply (plan + apply sur merge main)
+# Déclenché uniquement sur push/merge vers main
+# =============================================================================
+#
+# PRÉ-REQUIS
+# ─────────────────────────────────────────────────────────────────────
+#  - Variable Group "terraform-backend"  → TF_BACKEND_RG, TF_BACKEND_SA,
+#                                          TF_BACKEND_CONTAINER, TF_BACKEND_KEY
+#  - Service Connection                  → sc-formation-devops-sub1
+#  - Environment "prod"                  → avec Approval check configurée
+# =============================================================================
+
+trigger:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '**.md'
+      - 'docs/**'
+
+pr: none
+
+variables:
+  - group: terraform-backend
+
+  - name: TF_VERSION
+    value: '1.7.5'
+
+  - name: azureServiceConnection
+    value: 'sc-formation-devops-sub1'
+
+  - name: TF_IN_AUTOMATION
+    value: 'true'
+
+  - name: TF_CLI_ARGS
+    value: '-no-color'
+
+
+# =============================================================================
+# STAGE 1 — PLAN
+# =============================================================================
+stages:
+
+- stage: Plan
+  displayName: 'Terraform Plan'
+  jobs:
+
+  - job: TerraformPlan
+    displayName: 'terraform init + plan'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Installer Terraform $(TF_VERSION)'
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformTaskV4@4
+      displayName: 'terraform init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)'
+        backendServiceArm: '$(azureServiceConnection)'
+        backendAzureRmResourceGroupName: '$(TF_BACKEND_RG)'
+        backendAzureRmStorageAccountName: '$(TF_BACKEND_SA)'
+        backendAzureRmContainerName: '$(TF_BACKEND_CONTAINER)'
+        backendAzureRmKey: '$(TF_BACKEND_KEY)'
+        commandOptions: '-input=false'
+
+    - task: AzureCLI@2
+      displayName: 'Libérer le verrou state (si existant)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az storage blob lease break \
+            --blob-name "$(TF_BACKEND_KEY)" \
+            --container-name "$(TF_BACKEND_CONTAINER)" \
+            --account-name "$(TF_BACKEND_SA)" \
+            --auth-mode login \
+            && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
+
+    - task: AzureCLI@2
+      displayName: 'Configurer kubeconfig AKS (provider Helm)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          AKS_RG=$(az aks list --query "[0].resourceGroup" -o tsv 2>/dev/null || true)
+          AKS_NAME=$(az aks list --query "[0].name" -o tsv 2>/dev/null || true)
+          if [ -n "$AKS_RG" ] && [ -n "$AKS_NAME" ]; then
+            az aks get-credentials --resource-group "$AKS_RG" --name "$AKS_NAME" --overwrite-existing
+            echo "✔ Kubeconfig configuré : $AKS_NAME"
+          else
+            echo "⚠ Aucun cluster AKS trouvé"
+          fi
+
+    - task: TerraformTaskV4@4
+      displayName: 'terraform plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)'
+        environmentServiceNameAzureRM: '$(azureServiceConnection)'
+        commandOptions: '-input=false -out=tfplan.binary'
+
+    - publish: '$(System.DefaultWorkingDirectory)/tfplan.binary'
+      artifact: 'terraform-plan'
+      displayName: 'Publier artifact tfplan.binary'
+
+
+# =============================================================================
+# STAGE 2 — APPLY  (gate manuelle via Environment prod)
+# =============================================================================
+- stage: Apply
+  displayName: 'Terraform Apply — prod (gate manuelle)'
+  dependsOn: Plan
+  condition: succeeded()
+  jobs:
+
+  - deployment: TerraformApply
+    displayName: 'terraform apply'
+    pool:
+      vmImage: 'ubuntu-latest'
+    environment: 'prod'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+
+          - checkout: self
+
+          - task: TerraformInstaller@1
+            displayName: 'Installer Terraform $(TF_VERSION)'
+            inputs:
+              terraformVersion: '$(TF_VERSION)'
+
+          - download: current
+            artifact: 'terraform-plan'
+            displayName: 'Télécharger tfplan.binary'
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform init'
+            inputs:
+              provider: 'azurerm'
+              command: 'init'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              backendServiceArm: '$(azureServiceConnection)'
+              backendAzureRmResourceGroupName: '$(TF_BACKEND_RG)'
+              backendAzureRmStorageAccountName: '$(TF_BACKEND_SA)'
+              backendAzureRmContainerName: '$(TF_BACKEND_CONTAINER)'
+              backendAzureRmKey: '$(TF_BACKEND_KEY)'
+              commandOptions: '-input=false'
+
+          - task: AzureCLI@2
+            displayName: 'Libérer le verrou state (si existant)'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                az storage blob lease break \
+                  --blob-name "$(TF_BACKEND_KEY)" \
+                  --container-name "$(TF_BACKEND_CONTAINER)" \
+                  --account-name "$(TF_BACKEND_SA)" \
+                  --auth-mode login \
+                  && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
+
+          - task: AzureCLI@2
+            displayName: 'Configurer kubeconfig AKS (provider Helm)'
+            inputs:
+              azureSubscription: '$(azureServiceConnection)'
+              scriptType: 'bash'
+              scriptLocation: 'inlineScript'
+              inlineScript: |
+                AKS_RG=$(az aks list --query "[0].resourceGroup" -o tsv 2>/dev/null || true)
+                AKS_NAME=$(az aks list --query "[0].name" -o tsv 2>/dev/null || true)
+                if [ -n "$AKS_RG" ] && [ -n "$AKS_NAME" ]; then
+                  az aks get-credentials --resource-group "$AKS_RG" --name "$AKS_NAME" --overwrite-existing
+                fi
+
+          - task: TerraformTaskV4@4
+            displayName: 'terraform apply'
+            inputs:
+              provider: 'azurerm'
+              command: 'apply'
+              workingDirectory: '$(System.DefaultWorkingDirectory)'
+              environmentServiceNameAzureRM: '$(azureServiceConnection)'
+              commandOptions: '-auto-approve $(Pipeline.Workspace)/terraform-plan/tfplan.binary'

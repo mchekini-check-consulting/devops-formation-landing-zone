@@ -1,0 +1,327 @@
+# =============================================================================
+# azure-pipelines-pr.yml — Pipeline PR (validate + security + infracost + plan)
+# Déclenché uniquement sur les Pull Requests ciblant main
+# =============================================================================
+#
+# PRÉ-REQUIS
+# ─────────────────────────────────────────────────────────────────────
+#  - Variable Group "terraform-backend"  → TF_BACKEND_RG, TF_BACKEND_SA,
+#                                          TF_BACKEND_CONTAINER, TF_BACKEND_KEY
+#  - Variable Group "infracost-secrets"  → INFRACOST_API_KEY, GITHUB_TOKEN
+#  - Service Connection                  → sc-formation-devops-sub1
+# =============================================================================
+
+trigger: none
+
+pr:
+  branches:
+    include:
+      - main
+  paths:
+    exclude:
+      - '**.md'
+      - 'docs/**'
+
+variables:
+  - group: terraform-backend
+  - group: infracost-secrets
+
+  - name: TF_VERSION
+    value: '1.7.5'
+
+  - name: TFLINT_VERSION
+    value: '0.50.3'
+
+  - name: TFSEC_VERSION
+    value: '1.28.6'
+
+  - name: azureServiceConnection
+    value: 'sc-formation-devops-sub1'
+
+  - name: TF_IN_AUTOMATION
+    value: 'true'
+
+  - name: TF_CLI_ARGS
+    value: '-no-color'
+
+
+# =============================================================================
+# STAGE 1 — VALIDATE
+# =============================================================================
+stages:
+
+- stage: Validate
+  displayName: 'Validate — fmt + validate'
+  jobs:
+
+  - job: FmtCheck
+    displayName: 'terraform fmt -check'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Installer Terraform $(TF_VERSION)'
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - script: terraform fmt -check -recursive -diff
+      displayName: 'terraform fmt -check -recursive'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+  - job: TfValidate
+    displayName: 'terraform validate'
+    dependsOn: FmtCheck
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Installer Terraform $(TF_VERSION)'
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - script: terraform init -backend=false -input=false
+      displayName: 'terraform init -backend=false'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+    - script: terraform validate
+      displayName: 'terraform validate'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+
+# =============================================================================
+# STAGE 2 — SECURITY  (3 jobs parallèles)
+# =============================================================================
+- stage: Security
+  displayName: 'Security — tflint + tfsec + checkov'
+  dependsOn: Validate
+  condition: succeeded()
+  jobs:
+
+  - job: TFLint
+    displayName: 'tflint (plugin azurerm)'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - bash: |
+        set -e
+        curl -sLo /tmp/tflint.zip \
+          "https://github.com/terraform-linters/tflint/releases/download/v$(TFLINT_VERSION)/tflint_linux_amd64.zip"
+        unzip -q /tmp/tflint.zip -d /usr/local/bin
+        chmod +x /usr/local/bin/tflint
+        tflint --version
+        tflint --init
+        tflint --recursive --format compact
+      displayName: 'tflint --recursive'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+
+  - job: TFSec
+    displayName: 'tfsec'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - bash: |
+        set -e
+        curl -sLo /usr/local/bin/tfsec \
+          "https://github.com/aquasecurity/tfsec/releases/download/v$(TFSEC_VERSION)/tfsec-linux-amd64"
+        chmod +x /usr/local/bin/tfsec
+        tfsec . --format lovely --include-passed --minimum-severity MEDIUM
+      displayName: 'tfsec .'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      continueOnError: true
+
+  - job: Checkov
+    displayName: 'checkov'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - script: |
+        pip install checkov --quiet
+        checkov -d . --framework terraform --compact --soft-fail
+      displayName: 'Checkov IaC scan'
+
+
+# =============================================================================
+# STAGE 3 — INFRACOST
+# =============================================================================
+- stage: Infracost
+  displayName: 'Infracost — diff coût'
+  dependsOn: Security
+  condition: succeeded()
+  jobs:
+
+  - job: InfracostDiff
+    displayName: 'Diff coût Azure'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+      fetchDepth: 0
+
+    - bash: |
+        set -e
+        curl -fsSL https://raw.githubusercontent.com/infracost/infracost/master/scripts/install.sh | sh
+        infracost --version
+      displayName: 'Installer Infracost'
+
+    - bash: |
+        set -e
+        git fetch origin main:refs/remotes/origin/main
+        mkdir -p /tmp/infracost-baseline
+        git --work-tree=/tmp/infracost-baseline checkout origin/main -- .
+        infracost breakdown \
+          --path /tmp/infracost-baseline \
+          --format json \
+          --out-file /tmp/infracost-base.json
+      displayName: 'Baseline coût (branche main)'
+      env:
+        INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+
+    - bash: |
+        set -e
+        infracost diff \
+          --path . \
+          --compare-to /tmp/infracost-base.json \
+          --format json \
+          --out-file /tmp/infracost-diff.json
+        infracost output --path /tmp/infracost-diff.json --format table
+      displayName: 'Diff Infracost PR vs main'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      env:
+        INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+
+    - bash: |
+        set -e
+        REPO_SLUG=$(echo "$(Build.Repository.Uri)" | sed 's|.*github\.com/||')
+        infracost comment github \
+          --path /tmp/infracost-diff.json \
+          --github-token "$(GITHUB_TOKEN)" \
+          --pull-request "$(System.PullRequest.PullRequestNumber)" \
+          --repo "$REPO_SLUG" \
+          --behavior update
+      displayName: 'Commenter Infracost sur la PR'
+      env:
+        INFRACOST_API_KEY: $(INFRACOST_API_KEY)
+        GITHUB_TOKEN: $(GITHUB_TOKEN)
+
+
+# =============================================================================
+# STAGE 4 — PLAN
+# =============================================================================
+- stage: Plan
+  displayName: 'Terraform Plan'
+  dependsOn: Security
+  condition: succeeded()
+  jobs:
+
+  - job: TerraformPlan
+    displayName: 'terraform init + plan'
+    pool:
+      vmImage: 'ubuntu-latest'
+    steps:
+
+    - checkout: self
+
+    - task: TerraformInstaller@1
+      displayName: 'Installer Terraform $(TF_VERSION)'
+      inputs:
+        terraformVersion: '$(TF_VERSION)'
+
+    - task: TerraformTaskV4@4
+      displayName: 'terraform init'
+      inputs:
+        provider: 'azurerm'
+        command: 'init'
+        workingDirectory: '$(System.DefaultWorkingDirectory)'
+        backendServiceArm: '$(azureServiceConnection)'
+        backendAzureRmResourceGroupName: '$(TF_BACKEND_RG)'
+        backendAzureRmStorageAccountName: '$(TF_BACKEND_SA)'
+        backendAzureRmContainerName: '$(TF_BACKEND_CONTAINER)'
+        backendAzureRmKey: '$(TF_BACKEND_KEY)'
+        commandOptions: '-input=false'
+
+    - task: AzureCLI@2
+      displayName: 'Libérer le verrou state (si existant)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          az storage blob lease break \
+            --blob-name "$(TF_BACKEND_KEY)" \
+            --container-name "$(TF_BACKEND_CONTAINER)" \
+            --account-name "$(TF_BACKEND_SA)" \
+            --auth-mode login \
+            && echo "✔ Verrou libéré" || echo "ℹ Aucun verrou actif"
+
+    - task: AzureCLI@2
+      displayName: 'Configurer kubeconfig AKS (provider Helm)'
+      inputs:
+        azureSubscription: '$(azureServiceConnection)'
+        scriptType: 'bash'
+        scriptLocation: 'inlineScript'
+        inlineScript: |
+          AKS_RG=$(az aks list --query "[0].resourceGroup" -o tsv 2>/dev/null || true)
+          AKS_NAME=$(az aks list --query "[0].name" -o tsv 2>/dev/null || true)
+          if [ -n "$AKS_RG" ] && [ -n "$AKS_NAME" ]; then
+            az aks get-credentials --resource-group "$AKS_RG" --name "$AKS_NAME" --overwrite-existing
+            echo "✔ Kubeconfig configuré : $AKS_NAME"
+          else
+            echo "⚠ Aucun cluster AKS trouvé"
+          fi
+
+    - task: TerraformTaskV4@4
+      displayName: 'terraform plan'
+      inputs:
+        provider: 'azurerm'
+        command: 'plan'
+        workingDirectory: '$(System.DefaultWorkingDirectory)'
+        environmentServiceNameAzureRM: '$(azureServiceConnection)'
+        commandOptions: '-input=false -out=tfplan.binary'
+
+    - bash: |
+        set -e
+        PR_NUMBER="$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
+        if [ -z "$PR_NUMBER" ]; then
+          echo "⚠ Pas de numéro de PR, commentaire ignoré."
+          exit 0
+        fi
+        REPO_SLUG=$(echo "$BUILD_REPOSITORY_URI" | sed 's|.*github\.com/||' | sed 's|\.git$||')
+        PLAN_CONTENT=$(terraform show -no-color tfplan.binary 2>/dev/null | head -c 60000 || echo "Plan non disponible")
+        BODY=$(jq -n --arg c "## Terraform Plan — \`$BUILD_SOURCEBRANCHNAME\`
+        > Run : [#$BUILD_BUILDNUMBER]($SYSTEM_COLLECTIONURI$SYSTEM_TEAMPROJECT/_build/results?buildId=$BUILD_BUILDID)
+
+        <details><summary>Plan complet</summary>
+
+        \`\`\`
+        ${PLAN_CONTENT}
+        \`\`\`
+
+        </details>" \
+          '{body: $c}')
+        HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
+          -X POST \
+          -H "Authorization: token $GITHUB_TOKEN" \
+          -H "Content-Type: application/json" \
+          -d "$BODY" \
+          "https://api.github.com/repos/${REPO_SLUG}/issues/${PR_NUMBER}/comments")
+        echo "GitHub API response: HTTP $HTTP_CODE"
+      displayName: 'Commenter le plan sur la PR (GitHub)'
+      workingDirectory: '$(System.DefaultWorkingDirectory)'
+      env:
+        GITHUB_TOKEN: $(GITHUB_TOKEN)

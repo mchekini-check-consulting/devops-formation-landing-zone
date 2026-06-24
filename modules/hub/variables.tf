@@ -7,12 +7,12 @@ variable "location" {
 }
 
 variable "address_space" {
-  type = string
+  type    = string
   default = "10.0.0.0/16"
 }
 
 variable "tags" {
-  type = map(string)
+  type    = map(string)
   default = {}
 }
 
@@ -32,59 +32,18 @@ variable "readers_group_object_id" {
   type = string
 }
 
-variable "keycloak_vm_size" {
-  description = "Gabarit de la VM keycloak"
+variable "cicd_sp_object_id" {
+  description = "Object ID du Service Principal pipeline CI/CD (accès secrets Key Vault)"
   type        = string
 }
 
-variable "keycloak_vm_admin_username" {
-  description = "Utilisateur administrateur des VMs linux"
+variable "terraform_runner_object_id" {
+  description = "Object ID du compte/SP qui exécute Terraform en local"
   type        = string
 }
 
-variable "apim_publisher_email" {
-  description = "Email du publisher pour Azure API Management"
+variable "devops_sp_object_id" {
+  description = "Object ID du Service Principal DevOps (accès clés et secrets Key Vault)"
   type        = string
 }
 
-variable "frontend_public_ip" {
-  description = "IP publique du frontend (pour CORS APIM) - sera remplacee par l'IP AKS"
-  type        = string
-  default     = ""
-}
-
-variable "backend_vm_ip" {
-  description = "IP du backend (pour routage APIM) - sera remplacee par l'IP AKS"
-  type        = string
-  default     = ""
-}
-
-variable "payment_lb_ip" {
-  description = "IP du service payment (pour routage APIM) - sera remplacee par l'IP AKS"
-  type        = string
-  default     = ""
-}
-
-variable "fraud_check_function_urls" {
-  description = "value"
-  type = map(string)
-  default = {}
-}
-
-variable "catalog_rate_limit" {
-  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice catalog."
-  type        = number
-  default     = 300
-}
-
-variable "order_rate_limit" {
-  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice order."
-  type        = number
-  default     = 60
-}
-
-variable "payment_rate_limit" {
-  description = "Nombre maximum de requêtes par minute par utilisateur sur le microservice payment."
-  type        = number
-  default     = 20
-}

@@ -8,6 +8,12 @@ resource "azurerm_kubernetes_cluster_node_pool" "apps" {
   vnet_subnet_id        = azurerm_subnet.aks.id
   zones                 = ["1", "3"]
   tags                  = var.tags
+
+  upgrade_settings {
+    max_surge                     = "10%"
+    drain_timeout_in_minutes      = 0
+    node_soak_duration_in_minutes = 0
+  }
 }
 
 resource "azurerm_kubernetes_cluster_node_pool" "db" {
@@ -24,5 +30,11 @@ resource "azurerm_kubernetes_cluster_node_pool" "db" {
 
   node_labels = {
     workload = "database"
+  }
+
+  upgrade_settings {
+    max_surge                     = "10%"
+    drain_timeout_in_minutes      = 0
+    node_soak_duration_in_minutes = 0
   }
 }

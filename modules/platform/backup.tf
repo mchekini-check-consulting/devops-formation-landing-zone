@@ -44,11 +44,11 @@ resource "azurerm_user_assigned_identity" "backup" {
 }
 
 resource "azurerm_federated_identity_credential" "backup" {
-  name                = "fed-${var.team_name}-${var.project_name}-pg-backup"
+  name                      = "fed-${var.team_name}-${var.project_name}-pg-backup"
   user_assigned_identity_id = azurerm_user_assigned_identity.backup.id
-  audience            = ["api://AzureADTokenExchange"]
-  issuer              = var.oidc_issuer_url
-  subject             = "system:serviceaccount:postgres-backup:sa-pg-backup"
+  audience                  = ["api://AzureADTokenExchange"]
+  issuer                    = var.oidc_issuer_url
+  subject                   = "system:serviceaccount:postgres-backup:sa-pg-backup"
 }
 
 resource "azurerm_role_assignment" "backup_blob" {

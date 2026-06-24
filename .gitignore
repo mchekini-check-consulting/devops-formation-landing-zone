@@ -32,18 +32,4 @@ Thumbs.db
 architecture.dot
 architecture.png
 architecture-auto.mmd
-
-# Exclure totalement le dossier docs et tout son contenu
-/docs/
-
-# Exclure totalement le dossier sonarqube et tout son contenu
-/sonarqube/
-
-# Exclure des dossiers spécifiques à l'intérieur de k8s
-/k8s/catalogue/
-/k8s/front/
-/k8s/netpol/
-/k8s/payment/
-/k8s/order/
-/k8s/sonarqube/
-
+docs
