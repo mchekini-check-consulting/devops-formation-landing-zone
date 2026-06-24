@@ -296,15 +296,15 @@ stages:
 
     - bash: |
         set -e
-        PR_NUMBER="$(System.PullRequest.PullRequestNumber)"
+        PR_NUMBER="$SYSTEM_PULLREQUEST_PULLREQUESTNUMBER"
         if [ -z "$PR_NUMBER" ]; then
           echo "⚠ Pas de numéro de PR, commentaire ignoré."
           exit 0
         fi
-        REPO_SLUG=$(echo "$(Build.Repository.Uri)" | sed 's|.*github\.com/||' | sed 's|\.git$||')
+        REPO_SLUG=$(echo "$BUILD_REPOSITORY_URI" | sed 's|.*github\.com/||' | sed 's|\.git$||')
         PLAN_CONTENT=$(terraform show -no-color tfplan.binary 2>/dev/null | head -c 60000 || echo "Plan non disponible")
-        BODY=$(jq -n --arg c "## Terraform Plan — \`$(Build.SourceBranchName)\`
-        > Run : [#$(Build.BuildNumber)]($(System.CollectionUri)$(System.TeamProject)/_build/results?buildId=$(Build.BuildId))
+        BODY=$(jq -n --arg c "## Terraform Plan — \`$BUILD_SOURCEBRANCHNAME\`
+        > Run : [#$BUILD_BUILDNUMBER]($SYSTEM_COLLECTIONURI$SYSTEM_TEAMPROJECT/_build/results?buildId=$BUILD_BUILDID)
 
         <details><summary>Plan complet</summary>
 
@@ -316,7 +316,7 @@ stages:
           '{body: $c}')
         HTTP_CODE=$(curl -sS -o /dev/null -w "%{http_code}" \
           -X POST \
-          -H "Authorization: token $(GITHUB_TOKEN)" \
+          -H "Authorization: token $GITHUB_TOKEN" \
           -H "Content-Type: application/json" \
           -d "$BODY" \
           "https://api.github.com/repos/${REPO_SLUG}/issues/${PR_NUMBER}/comments")
