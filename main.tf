@@ -8,6 +8,9 @@ module "hub" {
   ssh_public_key_secret_name  = var.ssh_public_key_secret_name
   ssh_private_key_secret_name = var.ssh_private_key_secret_name
   readers_group_object_id     = var.readers_group_object_id
+  cicd_sp_object_id           = var.cicd_sp_object_id
+  terraform_runner_object_id  = var.terraform_runner_object_id
+  devops_sp_object_id         = var.devops_sp_object_id
 }
 
 

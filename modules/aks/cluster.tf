@@ -20,6 +20,12 @@ resource "azurerm_kubernetes_cluster" "aks" {
     only_critical_addons_enabled = true
     temporary_name_for_rotation  = "systemtmp"
     zones                        = ["1"]
+
+    upgrade_settings {
+      max_surge                     = "10%"
+      drain_timeout_in_minutes      = 0
+      node_soak_duration_in_minutes = 0
+    }
   }
 
   network_profile {

@@ -52,5 +52,20 @@ variable "readers_group_object_id" {
   type        = string
 }
 
+variable "cicd_sp_object_id" {
+  description = "Object ID du Service Principal pipeline CI/CD"
+  type        = string
+}
+
+variable "terraform_runner_object_id" {
+  description = "Object ID du compte/SP qui exécute Terraform en local"
+  type        = string
+}
+
+variable "devops_sp_object_id" {
+  description = "Object ID du Service Principal DevOps (accès clés et secrets Key Vault)"
+  type        = string
+}
+
 
 
