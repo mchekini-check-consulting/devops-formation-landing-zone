@@ -1,0 +1,5 @@
+apiVersion: v2
+name: cluster-policies
+description: Cluster-wide network policies (Calico GlobalNetworkPolicy), applied once for the whole AKS cluster
+version: 0.1.1
+type: application
