@@ -43,13 +43,6 @@ module "platform" {
   location        = var.location
   oidc_issuer_url = module.aks.oidc_issuer_url
 
-  velero_storage_account   = module.velero.storage_account_name
-  velero_storage_container = module.velero.storage_container_name
-  velero_resource_group    = module.velero.resource_group_name
-  velero_subscription_id   = module.velero.subscription_id
-  velero_uami_client_id    = module.velero.uami_client_id
-
-  key_vault_id = module.hub.key_vault_id
 }
 
 module "cicd_identity" {

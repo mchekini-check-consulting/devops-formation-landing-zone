@@ -37,16 +37,6 @@ output "backup_identity_client_id" {
   value       = module.platform.backup_identity_client_id
 }
 
-output "sonarqube_namespace" {
-  description = "Namespace K8s SonarQube — kubectl get svc -n <namespace> sonarqube-sonarqube pour récupérer l'IP du LoadBalancer"
-  value       = module.platform.sonarqube_namespace
-}
-
-output "sonarqube_admin_secret_name" {
-  description = "Nom du secret Key Vault contenant le mot de passe admin SonarQube"
-  value       = module.platform.sonarqube_admin_secret_name
-}
-
 #--------------------------------------------------------------
 # CI/CD Identity Outputs
 #--------------------------------------------------------------
