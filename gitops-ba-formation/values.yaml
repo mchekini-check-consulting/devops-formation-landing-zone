@@ -1,0 +1,86 @@
+# Définition des clusters-par-env cibles pour ArgoCD
+# Chaque environnement doit être enregistré dans ArgoCD sous le nom "<env>-cluster"
+# chaque resources est liee a son projet && un fichier values.yaml par projets 
+# les environnement doivent etre declarer et les resources labeliser dynamiquement
+# les resources liees a la company sont labelisses avec. 
+# toute l'authentification est avec oidc secretLess 'db,kafka,redis,cloudResources,keycloak'
+# add argoProject dans les templates 
+environments:
+  - dev
+  - qualif
+  # - prod
+
+# Utilisés dans des noms DNS : minuscules et tirets uniquement
+projectName: formation-business-analyst
+company: check-consulting
+dnsRoot: net
+
+# Dépôt Git contenant CE chart (utilisé par l'ApplicationSet)
+repoURL: https://github.com/<org>/<repo>.git
+targetRevision: main
+chartPath: mon-chart-application
+
+# NE PAS REMPLIR : injectés par l'ApplicationSet
+#   currentEnvironment vide  -> le chart rend l'ApplicationSet
+#   currentEnvironment rempli -> le chart rend les ressources de l'environnement
+currentEnvironment: ""
+onlyApp: ""
+
+# Réglages communs des Ingress (controller NGINX, un seul NLB par cluster)
+# Le NLB est créé par le Service du controller, pas par ces Ingress.
+# Les valeurs des annotations passent aussi par tpl.
+ingress:
+  className: nginx
+  annotations: {}
+    # Exemples (préfixe selon le controller installé) :
+    #   F5 NGINX Ingress Controller : nginx.org/client-max-body-size: "10m"
+    #   ingress-nginx (retiré)      : nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+
+# Dans les chaînes templatisées (envList, ingress.host, annotations) :
+#   {{ $currentEnv }} ou {{ .env }}   environnement courant
+#   {{ .Values.xxx }}                 n'importe quelle valeur de ce fichier
+#   {{ .app.name }} / {{ .app.type }} application courante
+applications:
+  - name: auth-backend
+    type: backend
+    image: myregistry.aws.io/{{ .Values.projectName }}/auth-api
+    tag: v1.2.0
+    containerPort: 8080
+    replicas: { dev: 1, qualif: 2, prod: 3 }
+    service:
+      port: 80
+    ingress:
+      enabled: true
+      host: "{{ $currentEnv }}-{{ .Values.projectName }}.{{ .Values.company }}.{{ .Values.dnsRoot }}"
+      path: /api
+    envList:
+      - key: REST_TO_ORDER
+        value: "order.{{ $currentEnv }}-{{ .Values.projectName }}:80"
+      - key: DB_URL
+        value: "jdbc:postgresql://{{ $currentEnv }}-{{ .Values.projectName }}:5432/{{ $currentEnv }}-db-{{ .app.name }}"
+      - key: KAFKA_HOST
+        value: "{{ $currentEnv }}-kafka.internal"
+      - key: REST_TO_ORDER
+        value: "order.{{ $currentEnv }}-{{ .Values.projectName }}:80"
+      - key: TOPIC_AUTH
+        value: "{{ $currentEnv }}-{{ .Values.projectName }}-create-auth"
+      - key: USER_AUTH
+        value: "{{ $currentEnv }}-{{ .Values.projectName }}-user-auth"
+      - key: LOG_LEVEL
+        value: "debug"
+
+  - name: store-frontend
+    type: frontend
+    image: myregistry.aws.io/{{ .Values.projectName }}/store-ui
+    tag: v2.0.1
+    containerPort: 8080
+    replicas: { dev: 1, qualif: 2, prod: 3 }
+    service:
+      port: 80
+    ingress:
+      enabled: true
+      host: "{{ $currentEnv }}-{{ .Values.projectName }}.{{ .Values.company }}.{{ .Values.dnsRoot }}"
+      path: /
+    envList:
+      - key: API_URL
+        value: "https://{{ $currentEnv }}-{{ .Values.projectName }}.{{ .Values.company }}.{{ .Values.dnsRoot }}"

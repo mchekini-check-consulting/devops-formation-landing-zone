@@ -1,0 +1,29 @@
+{{- if .Values.currentEnvironment }}
+{{- $env := .Values.currentEnvironment -}}
+{{- $project := .Values.projectName -}}
+{{- range $app := .Values.applications }}
+{{- if or (not $.Values.onlyApp) (eq $.Values.onlyApp $app.name) }}
+{{- $ctx := dict "env" $env "project" $project "app" $app "Values" $.Values "Template" $.Template }}
+{{- $lbl := dict "app" $app "env" $env "project" $project }}
+{{- $ns := printf "%s-%s-%s" $env $project $app.type }}
+{{- $svc := $app.service | default dict }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ $app.name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "mca.labels" $lbl | nindent 4 }}
+spec:
+  type: ClusterIP
+  selector:
+    {{- include "mca.selectorLabels" $lbl | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ $svc.port | default 80 }}
+      targetPort: http
+      protocol: TCP
+{{- end }}
+{{- end }}
+{{- end }}

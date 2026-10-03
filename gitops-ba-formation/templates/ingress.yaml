@@ -1,0 +1,43 @@
+{{- if .Values.currentEnvironment }}
+{{- $env := .Values.currentEnvironment -}}
+{{- $project := .Values.projectName -}}
+{{- range $app := .Values.applications }}
+{{- if or (not $.Values.onlyApp) (eq $.Values.onlyApp $app.name) }}
+{{- $ctx := dict "env" $env "project" $project "app" $app "Values" $.Values "Template" $.Template }}
+{{- $lbl := dict "app" $app "env" $env "project" $project }}
+{{- $ns := printf "%s-%s-%s" $env $project $app.type }}
+{{- $ing := $app.ingress | default dict }}
+{{- if $ing.enabled }}
+{{- $svc := $app.service | default dict }}
+{{- $host := include "mca.tpl" (dict "value" (required (printf "ingress.host manquant pour %s" $app.name) $ing.host) "ctx" $ctx) }}
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ $app.name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "mca.labels" $lbl | nindent 4 }}
+  {{- with $.Values.ingress.annotations }}
+  annotations:
+    {{- range $k, $v := . }}
+    {{ $k }}: {{ include "mca.tpl" (dict "value" $v "ctx" $ctx) | quote }}
+    {{- end }}
+  {{- end }}
+spec:
+  ingressClassName: {{ $.Values.ingress.className }}
+  rules:
+    - host: {{ $host }}
+      http:
+        paths:
+          - path: {{ $ing.path | default "/" }}
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ $app.name }}
+                port:
+                  number: {{ $svc.port | default 80 }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- end }}

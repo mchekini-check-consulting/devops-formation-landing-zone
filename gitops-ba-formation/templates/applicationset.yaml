@@ -1,0 +1,51 @@
+{{- /* Rendu UNIQUEMENT à l'installation dans ArgoCD (currentEnvironment vide).
+       Sans cette condition, chaque Application générée recréerait l'ApplicationSet. */}}
+{{- if not .Values.currentEnvironment }}
+apiVersion: argoproj.io/v1alpha1
+kind: ApplicationSet
+metadata:
+  name: {{ .Values.projectName }}
+  namespace: argocd
+spec:
+  goTemplate: true
+  goTemplateOptions: ["missingkey=error"]
+  generators:
+    - matrix:
+        generators:
+          - list:
+              elements:
+                {{- range .Values.environments }}
+                - env: {{ . }}
+                {{- end }}
+          - list:
+              elements:
+                {{- range .Values.applications }}
+                - app: {{ .name }}
+                  type: {{ .type }}
+                {{- end }}
+  template:
+    metadata:
+      # Les backticks empêchent Helm d'interpréter ce qui est destiné à l'ApplicationSet
+      name: '{{ `{{ .env }}-{{ .app }}` }}'
+    spec:
+      project: default  # il est ou le argoprojects ?? {{ .Values.projectName }}
+      source:
+        repoURL: {{ .Values.repoURL }}
+        targetRevision: {{ .Values.targetRevision }}
+        path: {{ .Values.chartPath }}
+        helm:
+          parameters:
+            - name: currentEnvironment
+              value: '{{ `{{ .env }}` }}'
+            - name: onlyApp
+              value: '{{ `{{ .app }}` }}'
+      destination:
+        name: '{{ `{{ .env }}` }}-cluster'
+        namespace: '{{ `{{ .env }}` }}-{{ .Values.projectName }}-{{ `{{ .type }}` }}'
+      syncPolicy:
+        automated:
+          prune: true
+          selfHeal: true
+        syncOptions:
+          - CreateNamespace=true
+{{- end }}

@@ -1,0 +1,45 @@
+{{- if .Values.currentEnvironment }}
+{{- $env := .Values.currentEnvironment -}}
+{{- $project := .Values.projectName -}}
+{{- range $app := .Values.applications }}
+{{- if or (not $.Values.onlyApp) (eq $.Values.onlyApp $app.name) }}
+{{- $ctx := dict "env" $env "project" $project "app" $app "Values" $.Values "Template" $.Template }}
+{{- $lbl := dict "app" $app "env" $env "project" $project }}
+{{- $ns := printf "%s-%s-%s" $env $project $app.type }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ $app.name }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "mca.labels" $lbl | nindent 4 }}
+spec:
+  # Réplicas selon l'environnement, 2 par défaut
+  replicas: {{ if kindIs "map" $app.replicas }}{{ index $app.replicas $env | default 2 }}{{ else }}{{ $app.replicas | default 2 }}{{ end }}
+  selector:
+    matchLabels:
+      {{- include "mca.selectorLabels" $lbl | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mca.labels" $lbl | nindent 8 }}
+      annotations:
+        # Redémarre les pods quand le contenu du ConfigMap change
+        checksum/config: {{ include "mca.configData" (dict "app" $app "ctx" $ctx) | sha256sum }}
+    spec:
+      containers:
+        - name: {{ $app.name }}
+          image: "{{ $app.image }}:{{ required (printf "tag manquant pour %s" $app.name) $app.tag }}"
+          ports:
+            - name: http
+              containerPort: {{ $app.containerPort | default 8080 }}
+              protocol: TCP
+          {{- if $app.envList }}
+          envFrom:
+            - configMapRef:
+                name: {{ $app.name }}
+          {{- end }}
+{{- end }}
+{{- end }}
+{{- end }}
