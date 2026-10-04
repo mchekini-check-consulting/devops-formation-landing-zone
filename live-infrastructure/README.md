@@ -17,15 +17,18 @@ live-infrastructure/
     ├── env.hcl                    # config commune AWS (region = "eu-west-3")
     │
     ├── modules/                   # code Terraform reutilisable
-    │   └── eks/                   # VPC + cluster EKS + node group (voir son README.md)
+    │   ├── eks/                   # VPC + cluster EKS + node group + addon Pod Identity (voir son README.md)
+    │   └── external-dns/          # role IAM Route53 (*.check-consulting.net) + association Pod Identity
     │
     ├── global/                    # ressources AWS transverses (pas de account.hcl requis)
     │
     └── environments/              # ressources scopees a un environnement/compte
         ├── dev/                   # compte AWS Dev (205493924920)
         │   ├── account.hcl        # team_name, aws_account_id, env_name = "dev"
-        │   └── eks/
-        │       └── terragrunt.hcl # source = ../../modules/eks, inputs (version, instance type, ...)
+        │   ├── eks/
+        │   │   └── terragrunt.hcl # source = ../../modules/eks, inputs (version, instance type, ...)
+        │   └── external-dns/
+        │       └── terragrunt.hcl # source = ../../modules/external-dns, dependency eks (cluster_name)
         │
         └── prod/                  # (vide pour l'instant)
 ```

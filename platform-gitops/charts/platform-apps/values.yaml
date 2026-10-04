@@ -39,3 +39,10 @@ tools:
     version: ""
     namespace: traefik
     syncWave: "0"
+  # Crée les enregistrements *.check-consulting.net des Ingress vers le NLB Traefik.
+  # Wave 10 : après Traefik, dont le Service fournit l'adresse du NLB.
+  external-dns:
+    enabled: true
+    version: ""
+    namespace: external-dns
+    syncWave: "10"

@@ -7,3 +7,7 @@ tools:
   traefik:
     repo: https://traefik.github.io/charts
     chart: traefik
+
+  external-dns:
+    repo: https://kubernetes-sigs.github.io/external-dns/
+    chart: external-dns

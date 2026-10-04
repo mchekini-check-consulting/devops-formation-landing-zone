@@ -28,3 +28,5 @@ tools:
     version: 10.9.6
   traefik:
     version: 41.6.1
+  external-dns:
+    version: 1.23.0
